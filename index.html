@@ -1,0 +1,1785 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>KDT Daily CTR/Shift Ticket Converter</title>
+    <script src="https://apis.google.com/js/api.js"></script>
+    <script src="https://accounts.google.com/gsi/client"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf-lib/1.17.1/pdf-lib.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/papaparse/5.4.1/papaparse.min.js"></script>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            background: linear-gradient(135deg, #2d4a3e 0%, #1a2e23 25%, #374a42 50%, #2d4a3e 75%, #1a2e23 100%);
+            min-height: 100vh;
+            padding: 20px;
+            color: #333;
+        }
+        
+        .container {
+            max-width: 1400px;
+            margin: 0 auto;
+            background: rgba(248, 249, 250, 0.98);
+            backdrop-filter: blur(10px);
+            border-radius: 15px;
+            box-shadow: 0 20px 40px rgba(0, 0, 0, 0.3);
+            border: 2px solid #5a6c57;
+            overflow: hidden;
+        }
+        
+        .header {
+            background: linear-gradient(135deg, #4a5d4a 0%, #3d503d 25%, #556b55 50%, #4a5d4a 75%, #3d503d 100%);
+            color: #f0f0f0;
+            padding: 30px;
+            text-align: center;
+            border-bottom: 3px solid #2d4a3e;
+        }
+        
+        .kdt-logo {
+            width: 80px;
+            height: 80px;
+            margin: 0 auto 20px;
+            display: block;
+            background: url('data:image/svg+xml,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100"><rect width="100" height="100" fill="%23556b55" rx="10"/><text x="50" y="55" text-anchor="middle" font-family="Arial" font-size="24" font-weight="bold" fill="%23f0f0f0">KDT</text></svg>') no-repeat center;
+            background-size: contain;
+            filter: drop-shadow(2px 2px 4px rgba(0, 0, 0, 0.5));
+        }
+        
+        .header h1 {
+            font-size: 2.5rem;
+            margin-bottom: 10px;
+            font-weight: 700;
+            text-shadow: 2px 2px 4px rgba(0, 0, 0, 0.5);
+            color: #f0f0f0;
+        }
+        
+        .header p {
+            opacity: 0.9;
+            font-size: 1.1rem;
+            color: #e0e0e0;
+        }
+        
+        .content {
+            padding: 40px;
+            background: #f8f9fa;
+        }
+        
+        .step {
+            margin-bottom: 40px;
+            padding: 30px;
+            background: #ffffff;
+            border-radius: 12px;
+            border: 2px solid #dee2e6;
+            transition: all 0.3s ease;
+            box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
+        }
+        
+        .step:hover {
+            border-color: #5a6c57;
+            transform: translateY(-2px);
+            box-shadow: 0 8px 16px rgba(90, 108, 87, 0.2);
+        }
+        
+        .step-title {
+            font-size: 1.4rem;
+            font-weight: 600;
+            color: #2d4a3e;
+            margin-bottom: 15px;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+        
+        .step-number {
+            background: linear-gradient(135deg, #5a6c57, #4a5d4a);
+            color: white;
+            width: 35px;
+            height: 35px;
+            border-radius: 8px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-weight: bold;
+            font-size: 1rem;
+            border: 2px solid #3d503d;
+            box-shadow: 0 2px 4px rgba(0, 0, 0, 0.2);
+        }
+        
+        .file-input {
+            position: relative;
+            display: inline-block;
+            cursor: pointer;
+            width: 100%;
+        }
+        
+        .file-input input[type="file"] {
+            position: absolute;
+            opacity: 0;
+            width: 100%;
+            height: 100%;
+            cursor: pointer;
+        }
+        
+        .file-input-label {
+            display: block;
+            padding: 20px;
+            border: 2px dashed #6c757d;
+            border-radius: 12px;
+            text-align: center;
+            transition: all 0.3s ease;
+            background: white;
+            color: #495057;
+        }
+        
+        .file-input:hover .file-input-label,
+        .file-input.has-file .file-input-label {
+            border-color: #5a6c57;
+            background: #f8f9fa;
+            color: #2d4a3e;
+        }
+        
+        input, select, button, textarea {
+            width: 100%;
+            padding: 15px;
+            border: 2px solid #dee2e6;
+            border-radius: 8px;
+            font-size: 1rem;
+            transition: all 0.3s ease;
+            background: white;
+        }
+        
+        input:focus, select:focus, button:focus, textarea:focus {
+            outline: none;
+            border-color: #5a6c57;
+            box-shadow: 0 0 0 3px rgba(90, 108, 87, 0.1);
+        }
+        
+        button {
+            background: linear-gradient(135deg, #5a6c57, #4a5d4a);
+            color: white;
+            border: none;
+            cursor: pointer;
+            font-weight: 600;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+            border: 2px solid #3d503d;
+        }
+        
+        button:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 6px 12px rgba(90, 108, 87, 0.3);
+            background: linear-gradient(135deg, #6c7f6c, #5a6c57);
+        }
+        
+        button:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+            transform: none;
+            background: #6c757d;
+            border-color: #6c757d;
+        }
+        
+        .preview {
+            background: white;
+            padding: 20px;
+            border-radius: 12px;
+            border: 2px solid #dee2e6;
+            margin-top: 20px;
+        }
+        
+        .preview h4 {
+            color: #2d4a3e;
+            margin-bottom: 15px;
+            font-size: 1.1rem;
+        }
+        
+        .data-row {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 15px;
+            padding: 15px;
+            background: #f8f9fa;
+            border-radius: 8px;
+            margin-bottom: 10px;
+            border: 1px solid #e9ecef;
+        }
+        
+        .data-item {
+            display: flex;
+            flex-direction: column;
+        }
+        
+        .data-label {
+            font-weight: 600;
+            color: #5a6c57;
+            font-size: 0.9rem;
+            margin-bottom: 5px;
+        }
+        
+        .data-value {
+            color: #2d4a3e;
+            background: white;
+            padding: 8px 12px;
+            border-radius: 6px;
+            border: 1px solid #dee2e6;
+        }
+        
+        .mapping-row {
+            display: grid;
+            grid-template-columns: 2fr 4fr 1fr auto;
+            gap: 15px;
+            padding: 15px;
+            background: white;
+            border: 1px solid #dee2e6;
+            align-items: center;
+        }
+        
+        .mapping-row:nth-child(even) {
+            background: #f8f9fa;
+        }
+        
+        .mapping-row input, .mapping-row textarea {
+            padding: 8px 12px;
+            font-size: 0.9rem;
+        }
+        
+        .mapping-row textarea {
+            resize: vertical;
+            min-height: 35px;
+            font-family: 'Monaco', 'Menlo', 'Ubuntu Mono', monospace;
+        }
+        
+        .formula-preview {
+            background: #e8f3e8;
+            padding: 6px 10px;
+            border-radius: 4px;
+            border: 1px solid #5a6c57;
+            font-size: 0.85rem;
+            color: #2d4a3e;
+            min-height: 30px;
+            display: flex;
+            align-items: center;
+        }
+        
+        .delete-mapping {
+            background: #dc3545;
+            color: white;
+            border: none;
+            padding: 8px 12px;
+            border-radius: 6px;
+            cursor: pointer;
+            font-size: 0.85rem;
+            width: auto;
+        }
+        
+        .delete-mapping:hover {
+            background: #c82333;
+        }
+        
+        .status {
+            padding: 15px;
+            border-radius: 12px;
+            margin-top: 20px;
+            font-weight: 600;
+        }
+        
+        .status.success {
+            background: #d4edda;
+            color: #155724;
+            border: 2px solid #c3e6cb;
+        }
+        
+        .status.error {
+            background: #f8d7da;
+            color: #721c24;
+            border: 2px solid #f5c6cb;
+        }
+        
+        .status.info {
+            background: #e2f1e8;
+            color: #2d4a3e;
+            border: 2px solid #5a6c57;
+        }
+        
+        .field-button {
+            margin: 5px;
+            padding: 8px 12px;
+            background: #e9ecef;
+            color: #2d4a3e;
+            border: 1px solid #dee2e6;
+            border-radius: 6px;
+            cursor: pointer;
+            font-size: 0.9rem;
+            width: auto;
+            display: inline-block;
+        }
+        
+        .field-button:hover {
+            background: #5a6c57;
+            color: white;
+            transform: none;
+        }
+        
+        .auth-section {
+            background: #d4edda;
+            border: 2px solid #5a6c57;
+            padding: 20px;
+            border-radius: 12px;
+            margin-bottom: 20px;
+        }
+        
+        .quick-formula-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 10px;
+            margin-top: 10px;
+        }
+        
+        .quick-formula-grid button {
+            font-size: 0.9rem;
+            padding: 10px;
+            width: auto;
+        }
+        
+        .mapping-header {
+            display: grid;
+            grid-template-columns: 2fr 4fr 1fr auto;
+            gap: 15px;
+            padding: 15px;
+            background: linear-gradient(135deg, #5a6c57, #4a5d4a) !important;
+            color: white !important;
+            border-radius: 8px 8px 0 0;
+            font-weight: 600;
+        }
+
+        @media (max-width: 768px) {
+            .content {
+                padding: 20px;
+            }
+            
+            .step {
+                padding: 20px;
+            }
+            
+            .header h1 {
+                font-size: 2rem;
+            }
+            
+            .mapping-row {
+                grid-template-columns: 1fr;
+                gap: 10px;
+            }
+            
+            .kdt-logo {
+                width: 60px;
+                height: 60px;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <!-- Space for your uploaded KDT logo -->
+            <div class="kdt-logo"></div>
+            
+            <h1>🎯 KDT Daily CTR/Shift Ticket Converter</h1>
+            <p>Convert timesheet data to CTR and Shift Ticket forms with collaborative project management</p>
+        </div>
+        
+        <div class="content">
+            <!-- Google Drive Authentication -->
+            <div class="step">
+                <div class="step-title">
+                    <div class="step-number">🔐</div>
+                    Google Drive Authentication
+                </div>
+                <p style="margin-bottom: 20px; color: #718096;">Connect to Google Drive to access sheets and manage project files collaboratively.</p>
+                
+                <div style="display: grid; grid-template-columns: 1fr auto; gap: 15px; align-items: center;">
+                    <div id="authStatus">
+                        <div style="color: #718096;">Not connected to Google Drive</div>
+                    </div>
+                    <button id="authorizeBtn" onclick="handleAuthClick()" style="width: auto; padding: 15px 25px;">
+                        🔗 Connect Google Drive
+                    </button>
+                </div>
+            </div>
+            
+            <!-- Project Management Section -->
+            <div class="step">
+                <div class="step-title">
+                    <div class="step-number">📁</div>
+                    Project Management
+                </div>
+                <p style="margin-bottom: 20px; color: #718096;">Create master projects with template timesheets and PDF forms. Colleagues can create assignments from your templates.</p>
+                
+                <div style="display: grid; grid-template-columns: 2fr auto auto; gap: 15px; margin-bottom: 20px;">
+                    <div>
+                        <label style="display: block; font-weight: 600; margin-bottom: 8px;">Project Mode:</label>
+                        <select id="projectMode" onchange="toggleProjectMode()">
+                            <option value="create">Create New Master Project</option>
+                            <option value="assignment">Start New Assignment</option>
+                            <option value="existing">Load Existing Assignment</option>
+                        </select>
+                    </div>
+                    <button onclick="createMasterProject()" id="createProjectBtn" style="height: fit-content; width: auto;">🎯 Create Master</button>
+                    <button onclick="showAssignmentDialog()" id="newAssignmentBtn" style="height: fit-content; width: auto; display: none;">📋 New Assignment</button>
+                </div>
+                
+                <!-- Master Project Creation -->
+                <div id="masterProjectSection">
+                    <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 15px; margin-bottom: 20px;">
+                        <div>
+                            <label style="display: block; font-weight: 600; margin-bottom: 8px;">Master Project Name:</label>
+                            <input type="text" id="masterProjectName" placeholder="e.g., KDT Daily CTR Master Template v1.0">
+                        </div>
+                        <div>
+                            <label style="display: block; font-weight: 600; margin-bottom: 8px;">Template Sheet URL:</label>
+                            <input type="text" id="templateSheetUrl" placeholder="Google Sheets URL (blank template)">
+                        </div>
+                    </div>
+                    
+                    <div style="margin-bottom: 20px;">
+                        <label style="display: block; font-weight: 600; margin-bottom: 8px;">Master Storage Folder URL:</label>
+                        <input type="text" id="masterFolderUrl" placeholder="Google Drive folder URL for all assignments">
+                    </div>
+                </div>
+                
+                <!-- Assignment Creation -->
+                <div id="assignmentSection" style="display: none;">
+                    <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 15px; margin-bottom: 20px;">
+                        <div>
+                            <label style="display: block; font-weight: 600; margin-bottom: 8px;">Select Master Project:</label>
+                            <select id="masterProjectSelect">
+                                <option value="">Choose a master project...</option>
+                            </select>
+                        </div>
+                        <div>
+                            <label style="display: block; font-weight: 600; margin-bottom: 8px;">Assignment Name:</label>
+                            <input type="text" id="assignmentName" placeholder="e.g., John_Smith_Week_12_2024">
+                        </div>
+                    </div>
+                </div>
+                
+                <div id="projectStatus"></div>
+            </div>
+            
+            <!-- Step 1: Google Sheet Integration -->
+            <div class="step">
+                <div class="step-title">
+                    <div class="step-number">1</div>
+                    Google Sheets Data
+                </div>
+                <p style="margin-bottom: 20px; color: #718096;">Link your Google Sheets timesheet or use the assigned sheet from your project.</p>
+                
+                <div id="sheetUrlSection">
+                    <div style="display: grid; grid-template-columns: 3fr auto; gap: 15px; margin-bottom: 20px;">
+                        <div>
+                            <label style="display: block; font-weight: 600; margin-bottom: 8px;">Google Sheets URL:</label>
+                            <input type="text" id="sheetUrl" placeholder="Paste Google Sheets sharing URL here">
+                        </div>
+                        <button onclick="loadGoogleSheet()" style="height: fit-content; width: auto;">📊 Load Sheet</button>
+                    </div>
+                </div>
+                
+                <div id="assignedSheetSection" style="display: none;">
+                    <div class="preview" style="background: #d4edda; border: 2px solid #5a6c57;">
+                        <h4 style="color: #2d4a3e;">📋 Assigned Timesheet</h4>
+                        <div id="assignedSheetInfo"></div>
+                        <button onclick="openAssignedSheet()" style="margin-top: 10px; background: #5a6c57; width: auto;">📝 Open My Timesheet</button>
+                    </div>
+                </div>
+                
+                <div id="sheetPreview"></div>
+            </div>
+            
+            <!-- Step 2: Select Day -->
+            <div class="step">
+                <div class="step-title">
+                    <div class="step-number">2</div>
+                    Select Day to Fill
+                </div>
+                <p style="margin-bottom: 20px; color: #718096;">Choose which day's data you want to use for filling the PDF forms.</p>
+                <select id="daySelect" disabled>
+                    <option value="">Load sheet first to see available days</option>
+                </select>
+                <div id="selectedDataPreview"></div>
+            </div>
+            
+            <!-- Step 2.5: Data Mapping & Formulas -->
+            <div class="step" id="mappingStep" style="display: none;">
+                <div class="step-title">
+                    <div class="step-number">2.5</div>
+                    Data Mapping & Formulas
+                </div>
+                <p style="margin-bottom: 20px; color: #718096;">Specify which data to transfer and how to calculate it. Use Google Sheets-style formulas to manipulate your data before filling PDFs.</p>
+                
+                <div style="display: grid; grid-template-columns: 2fr auto auto; gap: 15px; margin-bottom: 20px;">
+                    <div>
+                        <label style="display: block; font-weight: 600; margin-bottom: 10px;">Mapping Template:</label>
+                        <select id="templateSelect" onchange="loadMappingTemplate()">
+                            <option value="custom">Custom Mapping</option>
+                            <option value="ctr_daily">KDT Daily CTR Template</option>
+                            <option value="shift_ticket">Shift Ticket Template</option>
+                            <option value="timesheet">Generic Timesheet</option>
+                        </select>
+                    </div>
+                    <button type="button" onclick="addMappingRow()" style="width: auto; height: fit-content; margin-top: 30px;">
+                        ➕ Add Field
+                    </button>
+                    <button onclick="applyMappings()" style="background: linear-gradient(135deg, #28a745, #20c997); width: auto; height: fit-content; margin-top: 30px;">
+                        🔄 Apply Mappings
+                    </button>
+                </div>
+                
+                <div id="mappingContainer">
+                    <div class="mapping-header">
+                        <div>PDF Field Name</div>
+                        <div>Formula / Data Source</div>
+                        <div>Preview</div>
+                        <div>Actions</div>
+                    </div>
+                    <div id="mappingRows"></div>
+                </div>
+                
+                <!-- Interactive Field Selector -->
+                <div style="margin-top: 20px; padding: 20px; background: #f8f9fa; border-radius: 12px; border: 2px solid #e2e8f0;">
+                    <h4 style="color: #2d4a3e; margin-bottom: 15px;">🎯 Interactive Field Builder</h4>
+                    <p style="color: #718096; margin-bottom: 15px;">Click on column names below to build formulas visually:</p>
+                    
+                    <div id="availableFields" style="margin-bottom: 15px;">
+                        <div style="font-weight: 600; margin-bottom: 10px;">Available Columns:</div>
+                        <div id="fieldButtons"></div>
+                    </div>
+                    
+                    <div style="display: grid; grid-template-columns: 1fr auto; gap: 15px; align-items: end;">
+                        <div>
+                            <label style="display: block; font-weight: 600; margin-bottom: 8px;">Build Formula:</label>
+                            <input type="text" id="formulaBuilder" placeholder="Click field buttons or type formula..." style="font-family: monospace;">
+                        </div>
+                        <button onclick="insertCommonFormula()" style="width: auto;">⚡ Quick Formulas</button>
+                    </div>
+                    
+                    <div id="quickFormulaMenu" style="display: none; margin-top: 15px; padding: 15px; background: white; border-radius: 8px; border: 1px solid #d1d5db;">
+                        <div style="font-weight: 600; margin-bottom: 10px;">Quick Formula Templates:</div>
+                        <div class="quick-formula-grid">
+                            <button onclick="insertFormula('SUM({Hours})')" class="field-button">SUM({Hours})</button>
+                            <button onclick="insertFormula('IF({Hours}>8,{Hours}-8,0)')" class="field-button">Overtime Hours</button>
+                            <button onclick="insertFormula('ROUND({Hours}*{Rate},2)')" class="field-button">Hours × Rate</button>
+                            <button onclick="insertFormula('CONCATENATE({Employee},\" - \",{Department})')" class="field-button">Combine Text</button>
+                            <button onclick="insertFormula('MAX({Hours},8)')" class="field-button">MAX(Hours,8)</button>
+                            <button onclick="insertFormula('MIN({Hours},40)')" class="field-button">MIN(Hours,40)</button>
+                        </div>
+                    </div>
+                </div>
+                
+                <div style="margin-top: 20px; padding: 15px; background: #e2f1e8; border-radius: 8px; border-left: 4px solid #5a6c57;">
+                    <h4 style="color: #2d4a3e; margin-bottom: 10px;">📝 Google Sheets Style Formulas:</h4>
+                    <div style="color: #5a6c57; line-height: 1.6; font-size: 0.9rem;">
+                        <strong>Functions Available:</strong> SUM, IF, ROUND, MAX, MIN, ABS, CONCATENATE, UPPER, LOWER, LEFT, RIGHT, MID<br>
+                        <strong>Reference columns:</strong> Use {Column_Name} syntax<br>
+                        <strong>Examples:</strong><br>
+                        • <code>IF({Hours}>8,{Hours}-8,0)</code> - Calculate overtime (Google Sheets style)<br>
+                        • <code>ROUND({Hours}*{Rate},2)</code> - Round to 2 decimal places<br>
+                        • <code>CONCATENATE({Employee}," - ",{Department})</code> - Join text<br>
+                        • <code>SUM({Hours},{Overtime})</code> - Add multiple fields
+                    </div>
+                </div>
+                
+                <div id="mappingPreview"></div>
+            </div>
+            
+            <!-- Step 3: Upload PDF Forms -->
+            <div class="step">
+                <div class="step-title">
+                    <div class="step-number">3</div>
+                    Upload PDF Forms
+                </div>
+                <p style="margin-bottom: 20px; color: #718096;">Upload multiple PDF forms (CTR, Shift Ticket, etc.) that need to be filled with the selected day's data.</p>
+                
+                <div style="display: grid; grid-template-columns: 1fr auto; gap: 15px; margin-bottom: 20px;">
+                    <div class="file-input" id="pdfInput">
+                        <input type="file" id="pdfFile" accept=".pdf" multiple />
+                        <label for="pdfFile" class="file-input-label">
+                            <div style="font-size: 2rem; margin-bottom: 10px;">📋</div>
+                            <div><strong>Click to upload PDF forms (multiple files supported)</strong></div>
+                            <div style="color: #a0aec0; margin-top: 5px;">Or drag and drop here</div>
+                        </label>
+                    </div>
+                    <button onclick="clearAllForms()" style="height: fit-content; background: #dc3545; width: auto; padding: 15px 20px;">
+                        🗑️ Clear All
+                    </button>
+                </div>
+                
+                <div id="pdfFormsPreview"></div>
+            </div>
+            
+            <!-- Step 4: Fill Forms & Download -->
+            <div class="step">
+                <div class="step-title">
+                    <div class="step-number">4</div>
+                    Fill Forms & Download
+                </div>
+                <p style="margin-bottom: 20px; color: #718096;">Fill all PDF forms with the selected day's data and download the completed forms.</p>
+                
+                <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 15px; margin-bottom: 20px;">
+                    <button id="fillAllFormsBtn" disabled onclick="fillAllForms()">
+                        📝 Fill All Forms & Download
+                    </button>
+                    <button id="fillSelectedFormBtn" disabled onclick="fillSelectedForm()">
+                        📄 Fill Selected Form Only
+                    </button>
+                </div>
+                
+                <div id="formSelector" style="margin-bottom: 20px;">
+                    <label style="display: block; font-weight: 600; margin-bottom: 10px;">Select Form to Fill Individually:</label>
+                    <select id="singleFormSelect" disabled>
+                        <option value="">Upload forms first</option>
+                    </select>
+                </div>
+                
+                <div id="statusMessage"></div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // Global variables
+        let csvData = [];
+        let selectedDayData = null;
+        let pdfFiles = [];
+        let mappingRules = [];
+        let processedData = {};
+        let currentProject = null;
+        let currentAssignment = null;
+        let isAuthenticated = false;
+        
+        // Google API configuration - REPLACE WITH YOUR ACTUAL CREDENTIALS
+        const CLIENT_ID = 'YOUR_GOOGLE_CLIENT_ID.apps.googleusercontent.com';
+        const API_KEY = 'YOUR_GOOGLE_API_KEY';
+        const DISCOVERY_DOC = 'https://sheets.googleapis.com/$discovery/rest?version=v4';
+        const DISCOVERY_DRIVE = 'https://www.googleapis.com/discovery/v1/apis/drive/v3/rest';
+        const SCOPES = 'https://www.googleapis.com/auth/spreadsheets https://www.googleapis.com/auth/drive.file';
+        
+        let tokenClient;
+        let gapi;
+        
+        // Google Sheets style formula functions
+        const formulaFunctions = {
+            SUM: (...args) => args.reduce((a, b) => parseFloat(a || 0) + parseFloat(b || 0), 0),
+            IF: (condition, trueVal, falseVal) => condition ? trueVal : falseVal,
+            ROUND: (num, decimals = 0) => Math.round(parseFloat(num || 0) * Math.pow(10, decimals)) / Math.pow(10, decimals),
+            MAX: (...args) => Math.max(...args.map(a => parseFloat(a || 0))),
+            MIN: (...args) => Math.min(...args.map(a => parseFloat(a || 0))),
+            ABS: (num) => Math.abs(parseFloat(num || 0)),
+            CONCATENATE: (...args) => args.join(''),
+            UPPER: (text) => String(text || '').toUpperCase(),
+            LOWER: (text) => String(text || '').toLowerCase(),
+            LEFT: (text, num) => String(text || '').substring(0, parseInt(num || 0)),
+            RIGHT: (text, num) => String(text || '').substring(String(text || '').length - parseInt(num || 0)),
+            MID: (text, start, length) => String(text || '').substring(parseInt(start || 0) - 1, parseInt(start || 0) - 1 + parseInt(length || 0))
+        };
+        
+        // Mapping templates specific to KDT forms
+        const mappingTemplates = {
+            ctr_daily: [
+                { pdfField: 'employee_name', formula: '{Employee}', description: 'Employee Name' },
+                { pdfField: 'date', formula: '{Date}', description: 'Work Date' },
+                { pdfField: 'start_time', formula: '{Start_Time}', description: 'Start Time' },
+                { pdfField: 'end_time', formula: '{End_Time}', description: 'End Time' },
+                { pdfField: 'regular_hours', formula: 'IF({Hours}>8,8,{Hours})', description: 'Regular Hours (max 8)' },
+                { pdfField: 'overtime_hours', formula: 'IF({Hours}>8,{Hours}-8,0)', description: 'Overtime Hours' },
+                { pdfField: 'total_hours', formula: '{Hours}', description: 'Total Hours' },
+                { pdfField: 'job_number', formula: '{Job_Number}', description: 'Job Number' },
+                { pdfField: 'location', formula: '{Location}', description: 'Work Location' },
+                { pdfField: 'supervisor', formula: '{Supervisor}', description: 'Supervisor' }
+            ],
+            shift_ticket: [
+                { pdfField: 'employee', formula: '{Employee}', description: 'Employee Name' },
+                { pdfField: 'shift_date', formula: '{Date}', description: 'Shift Date' },
+                { pdfField: 'shift_start', formula: '{Start_Time}', description: 'Shift Start' },
+                { pdfField: 'shift_end', formula: '{End_Time}', description: 'Shift End' },
+                { pdfField: 'break_time', formula: 'IF({Break_Duration},"",30)', description: 'Break Time (default 30 min)' },
+                { pdfField: 'net_hours', formula: '{Hours}-({Break_Duration}/60)', description: 'Net Working Hours' },
+                { pdfField: 'equipment', formula: '{Equipment}', description: 'Equipment Used' },
+                { pdfField: 'work_description', formula: '{Description}', description: 'Work Description' },
+                { pdfField: 'materials', formula: '{Materials}', description: 'Materials Used' }
+            ],
+            timesheet: [
+                { pdfField: 'employee_name', formula: '{Employee}', description: 'Employee Name' },
+                { pdfField: 'date', formula: '{Date}', description: 'Work Date' },
+                { pdfField: 'start_time', formula: '{Start_Time}', description: 'Start Time' },
+                { pdfField: 'end_time', formula: '{End_Time}', description: 'End Time' },
+                { pdfField: 'regular_hours', formula: 'IF({Hours}>8,8,{Hours})', description: 'Regular Hours (max 8)' },
+                { pdfField: 'overtime_hours', formula: 'IF({Hours}>8,{Hours}-8,0)', description: 'Overtime Hours' },
+                { pdfField: 'total_hours', formula: '{Hours}', description: 'Total Hours' },
+                { pdfField: 'department', formula: '{Department}', description: 'Department' }
+            ]
+        };
+        
+        // Initialize app
+        window.addEventListener('load', async function() {
+            await initializeGoogleAPI();
+            setupEventListeners();
+            showStatus('🎯 KDT Daily CTR/Shift Ticket Converter ready! Connect to Google Drive to start.', 'info');
+        });
+        
+        // Setup event listeners
+        function setupEventListeners() {
+            document.getElementById('pdfFile').addEventListener('change', handlePDFUpload);
+            document.getElementById('daySelect').addEventListener('change', handleDaySelection);
+            
+            // Drag and drop for PDF files
+            const pdfInput = document.getElementById('pdfInput');
+            pdfInput.addEventListener('dragover', (e) => {
+                e.preventDefault();
+                pdfInput.querySelector('.file-input-label').style.borderColor = '#5a6c57';
+            });
+            pdfInput.addEventListener('dragleave', (e) => {
+                e.preventDefault();
+                pdfInput.querySelector('.file-input-label').style.borderColor = '#6c757d';
+            });
+            pdfInput.addEventListener('drop', (e) => {
+                e.preventDefault();
+                pdfInput.querySelector('.file-input-label').style.borderColor = '#6c757d';
+                const files = e.dataTransfer.files;
+                if (files.length > 0) {
+                    document.getElementById('pdfFile').files = files;
+                    handlePDFUpload({ target: { files } });
+                }
+            });
+        }
+        
+        // Initialize Google API
+        async function initializeGoogleAPI() {
+            try {
+                if (CLIENT_ID.includes('YOUR_GOOGLE_CLIENT_ID')) {
+                    showAuthStatus('⚠️ Please configure Google API credentials in the code. See setup instructions below.', 'error');
+                    showSetupInstructions();
+                    return;
+                }
+                
+                showAuthStatus('🔄 Initializing Google APIs...', 'info');
+                
+                await new Promise((resolve, reject) => {
+                    window.gapi.load('auth2', resolve);
+                });
+                
+                await window.gapi.client.init({
+                    apiKey: API_KEY,
+                    clientId: CLIENT_ID,
+                    discoveryDocs: [DISCOVERY_DOC, DISCOVERY_DRIVE],
+                    scope: SCOPES
+                });
+                
+                tokenClient = google.accounts.oauth2.initTokenClient({
+                    client_id: CLIENT_ID,
+                    scope: SCOPES,
+                    callback: (tokenResponse) => {
+                        isAuthenticated = true;
+                        document.getElementById('authorizeBtn').innerHTML = '✅ Connected to Google Drive';
+                        document.getElementById('authorizeBtn').disabled = true;
+                        showAuthStatus('✅ Successfully connected to Google Drive!', 'success');
+                        loadMasterProjects();
+                    },
+                });
+                
+                const authInstance = window.gapi.auth2.getAuthInstance();
+                if (authInstance.isSignedIn.get()) {
+                    isAuthenticated = true;
+                    document.getElementById('authorizeBtn').innerHTML = '✅ Connected to Google Drive';
+                    document.getElementById('authorizeBtn').disabled = true;
+                    showAuthStatus('✅ Already connected to Google Drive!', 'success');
+                    loadMasterProjects();
+                } else {
+                    showAuthStatus('🔗 Ready to connect. Click the button to authorize Google Drive access.', 'info');
+                }
+                
+            } catch (error) {
+                console.error('Error initializing Google API:', error);
+                showAuthStatus('❌ Error initializing Google APIs. Check your credentials and internet connection.', 'error');
+                showSetupInstructions();
+            }
+        }
+        
+        function showSetupInstructions() {
+            const instructions = `
+                <div style="margin-top: 20px; padding: 20px; background: #f8d7da; border: 2px solid #dc3545; border-radius: 12px;">
+                    <h4 style="color: #721c24; margin-bottom: 15px;">🔧 Google API Setup Required</h4>
+                    <div style="color: #721c24; line-height: 1.6;">
+                        <p><strong>To enable Google Drive integration:</strong></p>
+                        <ol style="margin: 10px 0; padding-left: 20px;">
+                            <li>Go to <a href="https://console.cloud.google.com" target="_blank" style="color: #5a6c57;">Google Cloud Console</a></li>
+                            <li>Create a new project or select existing one</li>
+                            <li>Enable Google Drive API and Google Sheets API</li>
+                            <li>Create OAuth 2.0 Client ID credentials</li>
+                            <li>Add your domain to authorized JavaScript origins</li>
+                            <li>Replace CLIENT_ID and API_KEY in the code</li>
+                        </ol>
+                        <p><strong>Current values to replace:</strong></p>
+                        <code style="background: #ffc1c3; padding: 5px; border-radius: 4px;">CLIENT_ID: ${CLIENT_ID}</code><br>
+                        <code style="background: #ffc1c3; padding: 5px; border-radius: 4px;">API_KEY: ${API_KEY}</code>
+                    </div>
+                </div>
+            `;
+            document.getElementById('authStatus').innerHTML = instructions;
+        }
+        
+        function handleAuthClick() {
+            if (!isAuthenticated && tokenClient) {
+                showAuthStatus('🔄 Requesting Google Drive access...', 'info');
+                tokenClient.requestAccessToken();
+            }
+        }
+        
+        function showAuthStatus(message, type) {
+            document.getElementById('authStatus').innerHTML = `<div class="status ${type}" style="margin: 0;">${message}</div>`;
+        }
+        
+        function toggleProjectMode() {
+            const mode = document.getElementById('projectMode').value;
+            const masterSection = document.getElementById('masterProjectSection');
+            const assignmentSection = document.getElementById('assignmentSection');
+            const createBtn = document.getElementById('createProjectBtn');
+            const assignmentBtn = document.getElementById('newAssignmentBtn');
+            const sheetUrlSection = document.getElementById('sheetUrlSection');
+            const assignedSheetSection = document.getElementById('assignedSheetSection');
+            
+            if (mode === 'create') {
+                masterSection.style.display = 'block';
+                assignmentSection.style.display = 'none';
+                createBtn.style.display = 'block';
+                assignmentBtn.style.display = 'none';
+                sheetUrlSection.style.display = 'block';
+                assignedSheetSection.style.display = 'none';
+            } else if (mode === 'assignment') {
+                masterSection.style.display = 'none';
+                assignmentSection.style.display = 'block';
+                createBtn.style.display = 'none';
+                assignmentBtn.style.display = 'block';
+                sheetUrlSection.style.display = 'none';
+                assignedSheetSection.style.display = 'block';
+            } else {
+                masterSection.style.display = 'none';
+                assignmentSection.style.display = 'none';
+                createBtn.style.display = 'none';
+                assignmentBtn.style.display = 'none';
+                sheetUrlSection.style.display = 'block';
+                assignedSheetSection.style.display = 'none';
+            }
+        }
+        
+        function loadMasterProjects() {
+            const masterProjects = JSON.parse(localStorage.getItem('kdtMasterProjects') || '{}');
+            const select = document.getElementById('masterProjectSelect');
+            select.innerHTML = '<option value="">Choose a master project...</option>';
+            
+            Object.keys(masterProjects).forEach(projectName => {
+                const option = document.createElement('option');
+                option.value = projectName;
+                option.textContent = projectName;
+                select.appendChild(option);
+            });
+        }
+        
+        async function createMasterProject() {
+            const projectName = document.getElementById('masterProjectName').value.trim();
+            const templateUrl = document.getElementById('templateSheetUrl').value.trim();
+            const folderUrl = document.getElementById('masterFolderUrl').value.trim();
+            
+            if (!projectName || !templateUrl || !folderUrl) {
+                showProjectStatus('❌ Please fill in all fields for the master project.', 'error');
+                return;
+            }
+            
+            if (!isAuthenticated) {
+                showProjectStatus('❌ Please connect to Google Drive first.', 'error');
+                return;
+            }
+            
+            try {
+                const sheetId = extractSheetId(templateUrl);
+                const folderId = extractFolderId(folderUrl);
+                
+                const masterProject = {
+                    name: projectName,
+                    templateSheetId: sheetId,
+                    templateSheetUrl: templateUrl,
+                    masterFolderId: folderId,
+                    masterFolderUrl: folderUrl,
+                    created: new Date().toISOString(),
+                    mappingRules: mappingRules,
+                    pdfForms: pdfFiles.map(file => ({ name: file.name, size: file.size })),
+                    version: '1.0'
+                };
+                
+                const masterProjects = JSON.parse(localStorage.getItem('kdtMasterProjects') || '{}');
+                masterProjects[projectName] = masterProject;
+                localStorage.setItem('kdtMasterProjects', JSON.stringify(masterProjects));
+                
+                currentProject = masterProject;
+                loadMasterProjects();
+                
+                showProjectStatus(`✅ Master project "${projectName}" created successfully! Colleagues can now create assignments from this template.`, 'success');
+                
+            } catch (error) {
+                showProjectStatus('❌ Error creating master project: ' + error.message, 'error');
+            }
+        }
+        
+        function showAssignmentDialog() {
+            const masterProjectName = document.getElementById('masterProjectSelect').value;
+            const assignmentName = document.getElementById('assignmentName').value.trim();
+            
+            if (!masterProjectName) {
+                showProjectStatus('❌ Please select a master project first.', 'error');
+                return;
+            }
+            
+            if (!assignmentName) {
+                showProjectStatus('❌ Please enter an assignment name.', 'error');
+                return;
+            }
+            
+            createNewAssignment(masterProjectName, assignmentName);
+        }
+        
+        async function createNewAssignment(masterProjectName, assignmentName) {
+            try {
+                const masterProjects = JSON.parse(localStorage.getItem('kdtMasterProjects') || '{}');
+                const masterProject = masterProjects[masterProjectName];
+                
+                if (!masterProject) {
+                    throw new Error('Master project not found');
+                }
+                
+                showProjectStatus('🔄 Creating assignment folders and copying template sheet...', 'info');
+                
+                const assignmentFolder = await createGoogleDriveFolder(
+                    assignmentName, 
+                    masterProject.masterFolderId
+                );
+                
+                const pdfFolder = await createGoogleDriveFolder(
+                    'PDFs', 
+                    assignmentFolder.id
+                );
+                
+                const newSheet = await createGoogleSheet(
+                    masterProject.templateSheetId,
+                    `${assignmentName} - Timesheet`
+                );
+                
+                await gapi.client.drive.files.update({
+                    fileId: newSheet.id,
+                    addParents: assignmentFolder.id,
+                    removeParents: 'root'
+                });
+                
+                const assignmentId = `${assignmentName}_${Date.now()}`;
+                const assignment = {
+                    id: assignmentId,
+                    name: assignmentName,
+                    masterProject: masterProjectName,
+                    sheetId: newSheet.id,
+                    sheetUrl: `https://docs.google.com/spreadsheets/d/${newSheet.id}`,
+                    assignmentFolderId: assignmentFolder.id,
+                    pdfFolderId: pdfFolder.id,
+                    created: new Date().toISOString(),
+                    status: 'active'
+                };
+                
+                const assignments = JSON.parse(localStorage.getItem('kdtAssignments') || '{}');
+                assignments[assignmentId] = assignment;
+                localStorage.setItem('kdtAssignments', JSON.stringify(assignments));
+                
+                currentAssignment = assignment;
+                mappingRules = [...masterProject.mappingRules];
+                renderMappingRows();
+                
+                document.getElementById('assignedSheetInfo').innerHTML = `
+                    <div><strong>Assignment:</strong> ${assignmentName}</div>
+                    <div><strong>Master Project:</strong> ${masterProjectName}</div>
+                    <div><strong>Sheet ID:</strong> ${newSheet.id}</div>
+                    <div><strong>Created:</strong> ${new Date().toLocaleDateString()}</div>
+                `;
+                
+                showProjectStatus(`✅ Assignment "${assignmentName}" created successfully! Your personal timesheet and folders are ready.`, 'success');
+                
+            } catch (error) {
+                console.error('Error creating assignment:', error);
+                showProjectStatus('❌ Error creating assignment: ' + error.message, 'error');
+            }
+        }
+        
+        function extractSheetId(url) {
+            const match = url.match(/\/spreadsheets\/d\/([a-zA-Z0-9-_]+)/);
+            if (!match) {
+                const altMatch = url.match(/spreadsheets\/d\/([a-zA-Z0-9-_]+)/);
+                return altMatch ? altMatch[1] : null;
+            }
+            return match[1];
+        }
+        
+        function extractFolderId(url) {
+            const match = url.match(/\/folders\/([a-zA-Z0-9-_]+)/);
+            if (!match) {
+                const altMatch = url.match(/folders\/([a-zA-Z0-9-_]+)/);
+                return altMatch ? altMatch[1] : null;
+            }
+            return match[1];
+        }
+        
+        function openAssignedSheet() {
+            if (currentAssignment && currentAssignment.sheetUrl) {
+                window.open(currentAssignment.sheetUrl, '_blank');
+            }
+        }
+        
+        async function loadGoogleSheet() {
+            const sheetUrl = document.getElementById('sheetUrl').value.trim();
+            if (!sheetUrl) {
+                showStatus('❌ Please enter a Google Sheets URL.', 'error');
+                return;
+            }
+            
+            if (!isAuthenticated) {
+                showStatus('❌ Please connect to Google Drive first.', 'error');
+                return;
+            }
+            
+            try {
+                showStatus('🔄 Loading Google Sheet data...', 'info');
+                
+                const sheetId = extractSheetId(sheetUrl);
+                if (!sheetId) {
+                    throw new Error('Invalid Google Sheets URL. Please check the URL format.');
+                }
+                
+                const response = await gapi.client.sheets.spreadsheets.values.get({
+                    spreadsheetId: sheetId,
+                    range: 'A:ZZ',
+                });
+                
+                const values = response.result.values;
+                if (!values || values.length === 0) {
+                    throw new Error('No data found in the spreadsheet.');
+                }
+                
+                const headers = values[0];
+                csvData = [];
+                
+                for (let i = 1; i < values.length; i++) {
+                    const row = {};
+                    headers.forEach((header, index) => {
+                        row[header] = values[i][index] || '';
+                    });
+                    csvData.push(row);
+                }
+                
+                displaySheetPreview();
+                populateDaySelector();
+                updateFieldButtons();
+                
+                showStatus(`✅ Google Sheet loaded successfully! Found ${csvData.length} rows of data.`, 'success');
+                
+            } catch (error) {
+                console.error('Error loading Google Sheet:', error);
+                showStatus('❌ Error loading Google Sheet: ' + error.message, 'error');
+            }
+        }
+        
+        async function createGoogleSheet(templateSheetId, newName) {
+            try {
+                const copyResponse = await gapi.client.drive.files.copy({
+                    fileId: templateSheetId,
+                    resource: {
+                        name: newName
+                    }
+                });
+                
+                return copyResponse.result;
+            } catch (error) {
+                console.error('Error creating Google Sheet:', error);
+                throw error;
+            }
+        }
+        
+        async function createGoogleDriveFolder(name, parentFolderId) {
+            try {
+                const response = await gapi.client.drive.files.create({
+                    resource: {
+                        name: name,
+                        mimeType: 'application/vnd.google-apps.folder',
+                        parents: parentFolderId ? [parentFolderId] : undefined
+                    }
+                });
+                
+                return response.result;
+            } catch (error) {
+                console.error('Error creating Google Drive folder:', error);
+                throw error;
+            }
+        }
+        
+        async function saveToGoogleDrive(pdfBytes, filename, folderId) {
+            try {
+                const metadata = {
+                    name: filename,
+                    parents: [folderId]
+                };
+                
+                const form = new FormData();
+                form.append('metadata', new Blob([JSON.stringify(metadata)], {type: 'application/json'}));
+                form.append('file', new Blob([pdfBytes], {type: 'application/pdf'}));
+                
+                const response = await fetch('https://www.googleapis.com/upload/drive/v3/files?uploadType=multipart', {
+                    method: 'POST',
+                    headers: new Headers({
+                        'Authorization': `Bearer ${gapi.auth2.getAuthInstance().currentUser.get().getAuthResponse().access_token}`
+                    }),
+                    body: form
+                });
+                
+                if (!response.ok) {
+                    throw new Error(`HTTP error! status: ${response.status}`);
+                }
+                
+                const result = await response.json();
+                return result;
+                
+            } catch (error) {
+                console.error('Error saving to Google Drive:', error);
+                throw error;
+            }
+        }
+        
+        function displaySheetPreview() {
+            const preview = document.getElementById('sheetPreview');
+            if (csvData.length === 0) {
+                preview.innerHTML = '';
+                return;
+            }
+            
+            const sampleData = csvData.slice(0, 3);
+            const headers = Object.keys(csvData[0]);
+            
+            let html = '<div class="preview"><h4>📊 Google Sheet Preview (first 3 rows)</h4>';
+            sampleData.forEach(row => {
+                html += '<div class="data-row">';
+                headers.forEach(header => {
+                    html += `
+                        <div class="data-item">
+                            <div class="data-label">${header}</div>
+                            <div class="data-value">${row[header] || ''}</div>
+                        </div>
+                    `;
+                });
+                html += '</div>';
+            });
+            html += '</div>';
+            
+            preview.innerHTML = html;
+        }
+        
+        function populateDaySelector() {
+            const select = document.getElementById('daySelect');
+            select.innerHTML = '<option value="">Select a day...</option>';
+            
+            const possibleDateColumns = Object.keys(csvData[0]).filter(key => 
+                key.toLowerCase().includes('date') || 
+                key.toLowerCase().includes('day') ||
+                key.toLowerCase().includes('time')
+            );
+            
+            if (possibleDateColumns.length > 0) {
+                const dateColumn = possibleDateColumns[0];
+                const uniqueDates = [...new Set(csvData.map(row => row[dateColumn]).filter(date => date))];
+                
+                uniqueDates.forEach((date, index) => {
+                    const option = document.createElement('option');
+                    option.value = index;
+                    option.textContent = `${date}`;
+                    select.appendChild(option);
+                });
+            } else {
+                csvData.forEach((row, index) => {
+                    const option = document.createElement('option');
+                    option.value = index;
+                    option.textContent = `Row ${index + 1}`;
+                    select.appendChild(option);
+                });
+            }
+            
+            select.disabled = false;
+        }
+        
+        function handleDaySelection(event) {
+            const selectedIndex = parseInt(event.target.value);
+            if (isNaN(selectedIndex)) {
+                selectedDayData = null;
+                document.getElementById('selectedDataPreview').innerHTML = '';
+                document.getElementById('mappingStep').style.display = 'none';
+                updateFillButtons();
+                return;
+            }
+            
+            selectedDayData = csvData[selectedIndex];
+            displaySelectedData();
+            document.getElementById('mappingStep').style.display = 'block';
+            
+            if (mappingRules.length === 0) {
+                loadMappingTemplate('ctr_daily');
+            } else {
+                renderMappingRows();
+            }
+            
+            updateFillButtons();
+        }
+        
+        function displaySelectedData() {
+            const preview = document.getElementById('selectedDataPreview');
+            if (!selectedDayData) {
+                preview.innerHTML = '';
+                return;
+            }
+            
+            const headers = Object.keys(selectedDayData);
+            let html = '<div class="preview"><h4>📋 Selected Day Data</h4>';
+            html += '<div class="data-row">';
+            headers.forEach(header => {
+                html += `
+                    <div class="data-item">
+                        <div class="data-label">${header}</div>
+                        <div class="data-value">${selectedDayData[header] || ''}</div>
+                    </div>
+                `;
+            });
+            html += '</div></div>';
+            
+            preview.innerHTML = html;
+            updateFieldButtons();
+        }
+        
+        function updateFieldButtons() {
+            const container = document.getElementById('fieldButtons');
+            if (!selectedDayData) {
+                container.innerHTML = '<p style="color: #718096;">Select a day first to see available fields</p>';
+                return;
+            }
+            
+            const fields = Object.keys(selectedDayData);
+            let html = '';
+            fields.forEach(field => {
+                html += `<button onclick="insertField('${field}')" class="field-button">{${field}}</button>`;
+            });
+            container.innerHTML = html;
+        }
+        
+        function insertField(fieldName) {
+            const builder = document.getElementById('formulaBuilder');
+            builder.value += `{${fieldName}}`;
+            builder.focus();
+        }
+        
+        function insertCommonFormula() {
+            const menu = document.getElementById('quickFormulaMenu');
+            menu.style.display = menu.style.display === 'none' ? 'block' : 'none';
+        }
+        
+        function insertFormula(formula) {
+            const builder = document.getElementById('formulaBuilder');
+            builder.value = formula;
+            document.getElementById('quickFormulaMenu').style.display = 'none';
+            builder.focus();
+        }
+        
+        function handlePDFUpload(event) {
+            const files = Array.from(event.target.files);
+            if (!files.length) return;
+            
+            pdfFiles = files;
+            document.getElementById('pdfInput').classList.add('has-file');
+            displayPDFPreview();
+            updateFillButtons();
+        }
+        
+        function displayPDFPreview() {
+            const preview = document.getElementById('pdfFormsPreview');
+            if (pdfFiles.length === 0) {
+                preview.innerHTML = '';
+                return;
+            }
+            
+            let html = '<div class="preview"><h4>📋 Uploaded PDF Forms</h4>';
+            pdfFiles.forEach((file, index) => {
+                html += `
+                    <div class="data-row" style="display: flex; justify-content: space-between; align-items: center;">
+                        <div>
+                            <div class="data-label">Form ${index + 1}</div>
+                            <div class="data-value">${file.name}</div>
+                        </div>
+                        <button onclick="removePDFForm(${index})" class="delete-mapping" style="width: auto;">
+                            🗑️ Remove
+                        </button>
+                    </div>
+                `;
+            });
+            html += '</div>';
+            
+            preview.innerHTML = html;
+            
+            const select = document.getElementById('singleFormSelect');
+            select.innerHTML = '<option value="">Select a form...</option>';
+            pdfFiles.forEach((file, index) => {
+                const option = document.createElement('option');
+                option.value = index;
+                option.textContent = file.name;
+                select.appendChild(option);
+            });
+            select.disabled = false;
+            
+            showStatus(`✅ ${pdfFiles.length} PDF form(s) uploaded successfully!`, 'success');
+        }
+        
+        function removePDFForm(index) {
+            pdfFiles.splice(index, 1);
+            displayPDFPreview();
+            updateFillButtons();
+        }
+        
+        function clearAllForms() {
+            pdfFiles = [];
+            document.getElementById('pdfInput').classList.remove('has-file');
+            document.getElementById('pdfFile').value = '';
+            displayPDFPreview();
+            updateFillButtons();
+            showStatus('📁 All PDF forms cleared.', 'info');
+        }
+        
+        function updateFillButtons() {
+            const fillAllBtn = document.getElementById('fillAllFormsBtn');
+            const fillSelectedBtn = document.getElementById('fillSelectedFormBtn');
+            
+            fillAllBtn.disabled = !(selectedDayData && pdfFiles.length > 0 && Object.keys(processedData).length > 0);
+            fillSelectedBtn.disabled = !(selectedDayData && pdfFiles.length > 0 && Object.keys(processedData).length > 0);
+        }
+        
+        function loadMappingTemplate(templateName = null) {
+            if (!templateName) {
+                templateName = document.getElementById('templateSelect').value;
+            }
+            
+            if (templateName === 'custom') {
+                mappingRules = [];
+            } else {
+                mappingRules = [...mappingTemplates[templateName]];
+            }
+            
+            renderMappingRows();
+            updateFillButtons();
+        }
+        
+        function renderMappingRows() {
+            const container = document.getElementById('mappingRows');
+            container.innerHTML = '';
+            
+            mappingRules.forEach((rule, index) => {
+                const row = document.createElement('div');
+                row.className = 'mapping-row';
+                row.innerHTML = `
+                    <input type="text" value="${rule.pdfField}" onchange="updateMappingRule(${index}, 'pdfField', this.value)" placeholder="PDF field name">
+                    <div style="display: flex; gap: 5px;">
+                        <textarea onchange="updateMappingRule(${index}, 'formula', this.value)" placeholder="Formula or {Column_Name}" style="flex: 1;">${rule.formula}</textarea>
+                        <button onclick="useBuilderFormula(${index})" style="width: 80px; font-size: 0.8rem; padding: 5px;">Use Builder</button>
+                    </div>
+                    <div class="formula-preview" id="preview-${index}">-</div>
+                    <button class="delete-mapping" onclick="deleteMappingRule(${index})">🗑️</button>
+                `;
+                container.appendChild(row);
+            });
+            
+            updateAllPreviews();
+        }
+        
+        function addMappingRow() {
+            mappingRules.push({
+                pdfField: '',
+                formula: '',
+                description: ''
+            });
+            renderMappingRows();
+        }
+        
+        function deleteMappingRule(index) {
+            mappingRules.splice(index, 1);
+            renderMappingRows();
+            updateFillButtons();
+        }
+        
+        function updateMappingRule(index, field, value) {
+            mappingRules[index][field] = value;
+            if (field === 'formula') {
+                updatePreview(index);
+            }
+            updateFillButtons();
+        }
+        
+        function useBuilderFormula(index) {
+            const builderValue = document.getElementById('formulaBuilder').value;
+            if (builderValue) {
+                mappingRules[index].formula = builderValue;
+                renderMappingRows();
+                document.getElementById('formulaBuilder').value = '';
+            }
+        }
+        
+        function updatePreview(index) {
+            if (!selectedDayData) return;
+            
+            const rule = mappingRules[index];
+            const previewElement = document.getElementById(`preview-${index}`);
+            
+            try {
+                const result = evaluateFormula(rule.formula, selectedDayData);
+                previewElement.textContent = result;
+                previewElement.style.color = '#2d4a3e';
+                previewElement.style.background = '#e8f3e8';
+            } catch (error) {
+                previewElement.textContent = 'Error';
+                previewElement.style.color = '#721c24';
+                previewElement.style.background = '#f8d7da';
+            }
+        }
+        
+        function updateAllPreviews() {
+            mappingRules.forEach((rule, index) => {
+                updatePreview(index);
+            });
+        }
+        
+        function evaluateFormula(formula, data) {
+            if (!formula) return '';
+            
+            if (formula.match(/^\{[^}]+\}$/)) {
+                const columnName = formula.slice(1, -1);
+                return data[columnName] || '';
+            }
+            
+            let processedFormula = formula;
+            const columnMatches = formula.match(/\{([^}]+)\}/g);
+            if (columnMatches) {
+                columnMatches.forEach(match => {
+                    const columnName = match.slice(1, -1);
+                    const value = data[columnName];
+                    if (value !== undefined && value !== null) {
+                        processedFormula = processedFormula.replace(match, `"${value}"`);
+                    } else {
+                        processedFormula = processedFormula.replace(match, '""');
+                    }
+                });
+            }
+            
+            try {
+                let result = processedFormula;
+                
+                result = result.replace(/SUM\(([^)]+)\)/g, (match, args) => {
+                    const values = args.split(',').map(arg => parseFloat(arg.replace(/"/g, '')) || 0);
+                    return formulaFunctions.SUM(...values);
+                });
+                
+                result = result.replace(/IF\(([^,]+),([^,]+),([^)]+)\)/g, (match, condition, trueVal, falseVal) => {
+                    const conditionResult = Function(`"use strict"; return (${condition.replace(/"/g, '')})`)();
+                    return conditionResult ? trueVal.replace(/"/g, '') : falseVal.replace(/"/g, '');
+                });
+                
+                result = result.replace(/ROUND\(([^,]+),?(\d*)\)/g, (match, num, decimals) => {
+                    const n = parseFloat(num.replace(/"/g, '')) || 0;
+                    const d = parseInt(decimals) || 0;
+                    return formulaFunctions.ROUND(n, d);
+                });
+                
+                result = result.replace(/(MAX|MIN)\(([^)]+)\)/g, (match, func, args) => {
+                    const values = args.split(',').map(arg => parseFloat(arg.replace(/"/g, '')) || 0);
+                    return formulaFunctions[func](...values);
+                });
+                
+                result = result.replace(/CONCATENATE\(([^)]+)\)/g, (match, args) => {
+                    const values = args.split(',').map(arg => arg.replace(/"/g, ''));
+                    return formulaFunctions.CONCATENATE(...values);
+                });
+                
+                if (typeof result === 'string' && (result.includes('+') || result.includes('-') || result.includes('*') || result.includes('/'))) {
+                    const mathResult = Function(`"use strict"; return (${result.replace(/"/g, '')})`)();
+                    if (!isNaN(mathResult)) {
+                        result = mathResult;
+                    }
+                }
+                
+                if (typeof result === 'string') {
+                    result = result.replace(/^"|"$/g, '');
+                }
+                
+                return result;
+                
+            } catch (error) {
+                throw new Error(`Formula error: ${error.message}`);
+            }
+        }
+        
+        function applyMappings() {
+            if (!selectedDayData) return;
+            
+            processedData = {};
+            let successCount = 0;
+            let errorCount = 0;
+            const results = [];
+            
+            mappingRules.forEach(rule => {
+                if (rule.pdfField && rule.formula) {
+                    try {
+                        const result = evaluateFormula(rule.formula, selectedDayData);
+                        processedData[rule.pdfField] = result;
+                        results.push(`✅ ${rule.pdfField}: ${result}`);
+                        successCount++;
+                    } catch (error) {
+                        results.push(`❌ ${rule.pdfField}: ${error.message}`);
+                        errorCount++;
+                    }
+                }
+            });
+            
+            const previewContainer = document.getElementById('mappingPreview');
+            let html = `
+                <div class="preview">
+                    <h4>📊 Processed Data Preview</h4>
+                    <div style="margin-bottom: 15px;">
+                        <span style="color: #155724; font-weight: 600;">${successCount} successful</span> • 
+                        <span style="color: #721c24; font-weight: 600;">${errorCount} errors</span>
+                    </div>
+                    <div style="max-height: 200px; overflow-y: auto; background: #f8f9fa; padding: 15px; border-radius: 8px;">
+            `;
+            
+            results.forEach(result => {
+                html += `<div style="margin-bottom: 5px; font-family: monospace; font-size: 0.9rem;">${result}</div>`;
+            });
+            
+            html += '</div></div>';
+            previewContainer.innerHTML = html;
+            
+            updateFillButtons();
+            showStatus(`✅ Mappings applied! ${successCount} fields processed successfully.`, 'success');
+        }
+        
+        async function fillAllForms() {
+            if (!selectedDayData || pdfFiles.length === 0 || !processedData || Object.keys(processedData).length === 0) {
+                showStatus('❌ Please apply mappings first before filling forms.', 'error');
+                return;
+            }
+            
+            try {
+                showStatus('🔄 Processing all PDF forms with your custom mappings...', 'info');
+                
+                const filledForms = [];
+                let successCount = 0;
+                
+                for (let i = 0; i < pdfFiles.length; i++) {
+                    const file = pdfFiles[i];
+                    try {
+                        showStatus(`🔄 Processing form ${i + 1}/${pdfFiles.length}: ${file.name}...`, 'info');
+                        const result = await fillSinglePDFForm(file, i + 1);
+                        filledForms.push(result);
+                        successCount++;
+                    } catch (error) {
+                        console.error(`Error filling form ${file.name}:`, error);
+                        filledForms.push({ name: file.name, error: error.message });
+                    }
+                }
+                
+                if (currentAssignment && isAuthenticated) {
+                    showStatus('🔄 Saving filled forms to Google Drive...', 'info');
+                    for (const result of filledForms) {
+                        if (result.pdfBytes) {
+                            await saveToGoogleDrive(result.pdfBytes, result.filename, currentAssignment.pdfFolderId);
+                        }
+                    }
+                    showStatus(`✅ All forms processed and saved to Google Drive! ${successCount}/${pdfFiles.length} forms completed successfully.`, 'success');
+                } else {
+                    for (let i = 0; i < filledForms.length; i++) {
+                        const result = filledForms[i];
+                        if (result.pdfBytes) {
+                            setTimeout(() => downloadPDF(result.pdfBytes, result.filename), i * 500);
+                        }
+                    }
+                    showStatus(`✅ All forms processed and downloaded! ${successCount}/${pdfFiles.length} forms completed successfully.`, 'success');
+                }
+                
+                let reportHtml = '<div style="margin-top: 15px; padding: 15px; background: #f8f9fa; border-radius: 8px;"><strong>📋 Processing Report:</strong><br><br>';
+                filledForms.forEach(result => {
+                    if (result.error) {
+                        reportHtml += `❌ <strong>${result.name}</strong>: ${result.error}<br>`;
+                    } else {
+                        reportHtml += `✅ <strong>${result.name}</strong>: ${result.fieldsCount} fields filled successfully<br>`;
+                    }
+                });
+                reportHtml += '</div>';
+                
+                const statusDiv = document.getElementById('statusMessage');
+                statusDiv.innerHTML += reportHtml;
+                
+            } catch (error) {
+                console.error('Error filling all forms:', error);
+                showStatus('❌ Error processing forms: ' + error.message, 'error');
+            }
+        }
+        
+        async function fillSelectedForm() {
+            const selectedIndex = parseInt(document.getElementById('singleFormSelect').value);
+            if (isNaN(selectedIndex) || !pdfFiles[selectedIndex]) {
+                showStatus('❌ Please select a form to fill.', 'error');
+                return;
+            }
+            
+            if (!processedData || Object.keys(processedData).length === 0) {
+                showStatus('❌ Please apply mappings first before filling the form.', 'error');
+                return;
+            }
+            
+            try {
+                const file = pdfFiles[selectedIndex];
+                const result = await fillSinglePDFForm(file, 1);
+                
+                if (currentAssignment) {
+                    showStatus(`✅ Form "${file.name}" filled and saved to assignment folder!`, 'success');
+                } else {
+                    downloadPDF(result.pdfBytes, result.filename);
+                    showStatus(`✅ Form "${file.name}" filled successfully! ${result.fieldsCount} fields populated.`, 'success');
+                }
+                
+            } catch (error) {
+                console.error('Error filling selected form:', error);
+                showStatus('❌ Error filling form: ' + error.message, 'error');
+            }
+        }
+        
+        async function fillSinglePDFForm(file, formNumber) {
+            const arrayBuffer = await file.arrayBuffer();
+            const pdfDoc = await PDFLib.PDFDocument.load(arrayBuffer);
+            const form = pdfDoc.getForm();
+            const fields = form.getFields();
+            
+            let filledCount = 0;
+            let matchingReport = [];
+            
+            fields.forEach(field => {
+                const fieldName = field.getName().toLowerCase().trim();
+                
+                let value = null;
+                let matchedKey = null;
+                
+                Object.keys(processedData).forEach(key => {
+                    if (key.toLowerCase().trim() === fieldName) {
+                        value = processedData[key];
+                        matchedKey = key;
+                    }
+                });
+                
+                if (value === null) {
+                    Object.keys(processedData).forEach(key => {
+                        const keyLower = key.toLowerCase().trim();
+                        if (fieldName.includes(keyLower) || keyLower.includes(fieldName)) {
+                            value = processedData[key];
+                            matchedKey = key;
+                        }
+                    });
+                }
+                
+                if (value !== null && value !== undefined && value !== '') {
+                    try {
+                        const fieldType = field.constructor.name;
+                        
+                        if (fieldType === 'PDFTextField') {
+                            field.setText(String(value));
+                            filledCount++;
+                            matchingReport.push(`✅ ${field.getName()} ← ${matchedKey} (${value})`);
+                        } else if (fieldType === 'PDFCheckBox') {
+                            const truthyValues = [true, 'true', 'yes', '1', 'checked', 'on'];
+                            if (truthyValues.includes(String(value).toLowerCase())) {
+                                field.check();
+                                filledCount++;
+                                matchingReport.push(`☑️ ${field.getName()} ← ${matchedKey} (checked)`);
+                            }
+                        } else if (fieldType === 'PDFDropdown') {
+                            try {
+                                field.select(String(value));
+                                filledCount++;
+                                matchingReport.push(`🔽 ${field.getName()} ← ${matchedKey} (${value})`);
+                            } catch (e) {
+                                const options = field.getOptions();
+                                const closeMatch = options.find(opt => 
+                                    opt.toLowerCase().includes(String(value).toLowerCase())
+                                );
+                                if (closeMatch) {
+                                    field.select(closeMatch);
+                                    filledCount++;
+                                    matchingReport.push(`🔽 ${field.getName()} ← ${matchedKey} (${closeMatch})`);
+                                }
+                            }
+                        }
+                    } catch (e) {
+                        console.warn(`Could not fill field ${field.getName()}:`, e);
+                        matchingReport.push(`❌ ${field.getName()} - Error: ${e.message}`);
+                    }
+                } else {
+                    matchingReport.push(`⚪ ${field.getName()} - No matching mapped data`);
+                }
+            });
+            
+            const pdfBytes = await pdfDoc.save();
+            
+            const dateStr = selectedDayData.date || selectedDayData.Date || selectedDayData.DAY || 
+                           new Date().toISOString().split('T')[0];
+            const baseFilename = file.name.replace('.pdf', '');
+            const filename = `${baseFilename}_${dateStr.toString().replace(/[/\\:*?"<>|]/g, '-')}_filled.pdf`;
+            
+            return {
+                name: file.name,
+                filename: filename,
+                pdfBytes: pdfBytes,
+                fieldsCount: filledCount,
+                matchingReport: matchingReport
+            };
+        }
+        
+        function downloadPDF(pdfBytes, filename) {
+            const blob = new Blob([pdfBytes], { type: 'application/pdf' });
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = filename;
+            document.body.appendChild(a);
+            a.click();
+            document.body.removeChild(a);
+            URL.revokeObjectURL(url);
+        }
+        
+        function showProjectStatus(message, type) {
+            const statusDiv = document.getElementById('projectStatus');
+            statusDiv.innerHTML = `<div class="status ${type}" style="margin-top: 15px;">${message}</div>`;
+        }
+        
+        function showStatus(message, type) {
+            const statusDiv = document.getElementById('statusMessage');
+            statusDiv.innerHTML = `<div class="status ${type}">${message}</div>`;
+        }
+    </script>
+</body>
+</html>
