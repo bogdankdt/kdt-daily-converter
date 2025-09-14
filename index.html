@@ -8,54 +8,44 @@
         <!-- NEW -->
         
         <script src="https://accounts.google.com/gsi/client"></script>
-                       <script>
-// Manual GAPI loading
-function loadGAPI() {
-    return new Promise((resolve, reject) => {
-        console.log('🔄 Loading GAPI manually...');
-        
-        // Create script element
-        const script = document.createElement('script');
-        script.src = 'https://apis.google.com/js/api.js';
-        script.async = true;
-        script.defer = true;
-        
-        script.onload = () => {
-            console.log('📦 GAPI script loaded');
-            // Wait a bit for gapi to be available
-            setTimeout(() => {
-                if (typeof gapi !== 'undefined') {
-                    console.log('✅ GAPI is now available');
-                    resolve();
-                } else {
-                    console.log('❌ GAPI still not available after script load');
-                    reject(new Error('GAPI not available'));
-                }
-            }, 500);
-        };
-        
-        script.onerror = () => {
-            console.log('❌ Failed to load GAPI script');
-            reject(new Error('Failed to load GAPI script'));
-        };
-        
-        document.head.appendChild(script);
-    });
-}
-
-// Test loading
-setTimeout(async () => {
-    console.log('=== STARTING MANUAL LOAD TEST ===');
+<script>
+// Deep investigation
+setTimeout(() => {
+    console.log('=== DEEP INVESTIGATION ===');
     
-    try {
-        await loadGAPI();
-        console.log('🎉 GAPI loaded successfully!');
-        console.log('gapi available:', typeof gapi);
-        console.log('google available:', typeof google);
-    } catch (error) {
-        console.log('💥 Failed to load GAPI:', error.message);
+    // Check if gapi exists under different names
+    console.log('window.gapi:', typeof window.gapi);
+    console.log('window.google:', typeof window.google);
+    console.log('this.gapi:', typeof this.gapi);
+    
+    // Look for gapi-related properties
+    const windowProps = Object.keys(window).filter(key => 
+        key.toLowerCase().includes('gapi') || key.toLowerCase().includes('api')
+    );
+    console.log('Window properties with "api":', windowProps);
+    
+    // Check all google properties
+    if (typeof window.google === 'object') {
+        console.log('google object properties:', Object.keys(window.google));
     }
-}, 1000);
+    
+    // Check for any errors in loading
+    console.log('Any CSP errors in console?');
+    
+}, 2000);
+
+// Also try the modern approach
+setTimeout(() => {
+    console.log('=== TRYING MODERN GOOGLE API LOADER ===');
+    
+    // Try loading the newer way
+    if (typeof google !== 'undefined' && google.accounts) {
+        console.log('✅ Google object available, trying to use it differently...');
+        
+        // Maybe we can use Google Identity Services for API calls too?
+        console.log('Available google methods:', Object.keys(google));
+    }
+}, 3000);
 </script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf-lib/1.17.1/pdf-lib.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/papaparse/5.4.1/papaparse.min.js"></script>
