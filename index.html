@@ -789,37 +789,51 @@ setTimeout(() => {
             });
         }
         
-// Initialize Google API
-async function initializeGoogleAPI() {
-    try {
-        // Check credentials first
-        if (CLIENT_ID.includes('YOUR_GOOGLE_CLIENT_ID')) {
-            showAuthStatus('⚠️ Please configure Google API credentials in the code.', 'error');
-            showSetupInstructions();
-            return;
-        }
-        
-        showAuthStatus('🔄 Loading Google APIs...', 'info');
-        
-        // Wait for Google APIs to load (with retry logic)
-        let attempts = 0;
-        const maxAttempts = 20; // Wait up to 10 seconds
-        
-        while (attempts < maxAttempts) {
-            if (typeof gapi !== 'undefined' && typeof google !== 'undefined') {
-                break;
+            // Initialize Google API
+            async function initializeGoogleAPI() {
+                try {
+                    // Check credentials first
+                    if (CLIENT_ID.includes('YOUR_GOOGLE_CLIENT_ID')) {
+                        showAuthStatus('⚠️ Please configure Google API credentials in the code.', 'error');
+                        showSetupInstructions();
+                        return;
+                    }
+                    
+                    showAuthStatus('🔄 Initializing modern Google APIs...', 'info');
+                    
+                    // We have google.accounts, let's use that for OAuth
+                    if (typeof google !== 'undefined' && google.accounts) {
+                        console.log('✅ Using Google Identity Services');
+                        
+                        // Initialize token client for OAuth
+                        tokenClient = google.accounts.oauth2.initTokenClient({
+                            client_id: CLIENT_ID,
+                            scope: SCOPES,
+                            callback: async (tokenResponse) => {
+                                console.log('🔑 Got OAuth token:', tokenResponse);
+                                isAuthenticated = true;
+                                
+                                // Store the access token for API calls
+                                window.accessToken = tokenResponse.access_token;
+                                
+                                document.getElementById('authorizeBtn').innerHTML = '✅ Connected to Google Drive';
+                                document.getElementById('authorizeBtn').disabled = true;
+                                showAuthStatus('✅ Successfully connected to Google Drive!', 'success');
+                                loadMasterProjects();
+                            },
+                        });
+                        
+                        showAuthStatus('🔗 Ready to connect. Click the button to authorize Google Drive access.', 'info');
+                        
+                    } else {
+                        throw new Error('Google Identity Services not available');
+                    }
+                    
+                } catch (error) {
+                    console.error('Error initializing Google API:', error);
+                    showAuthStatus(`❌ ${error.message}`, 'error');
+                }
             }
-            await new Promise(resolve => setTimeout(resolve, 500));
-            attempts++;
-        }
-        
-        if (typeof gapi === 'undefined') {
-            throw new Error('Google API failed to load. Please check your internet connection and refresh the page.');
-        }
-        
-        if (typeof google === 'undefined') {
-            throw new Error('Google Identity Services failed to load. Please check your internet connection and refresh the page.');
-        }
         
         // Initialize GAPI client
         await new Promise((resolve, reject) => {
