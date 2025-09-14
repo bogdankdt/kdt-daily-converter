@@ -770,46 +770,74 @@ async function initializeGoogleAPI() {
         
         showAuthStatus('🔄 Loading Google APIs...', 'info');
         
-        // Wait for scripts to load
-        await new Promise(resolve => setTimeout(resolve, 2000));
+        // Wait for Google APIs to load (with retry logic)
+        let attempts = 0;
+        const maxAttempts = 20; // Wait up to 10 seconds
         
-        // Initialize Google API client
-        if (typeof gapi !== 'undefined') {
-            await gapi.load('client', async () => {
-                await gapi.client.init({
-                    apiKey: API_KEY,
-                    discoveryDocs: [DISCOVERY_DOC, DISCOVERY_DRIVE],
-                });
-                
-                // Initialize token client
-                if (typeof google !== 'undefined' && google.accounts) {
-                    tokenClient = google.accounts.oauth2.initTokenClient({
-                        client_id: CLIENT_ID,
-                        scope: SCOPES,
-                        callback: (tokenResponse) => {
-                            isAuthenticated = true;
-                            document.getElementById('authorizeBtn').innerHTML = '✅ Connected to Google Drive';
-                            document.getElementById('authorizeBtn').disabled = true;
-                            showAuthStatus('✅ Successfully connected to Google Drive!', 'success');
-                            loadMasterProjects();
-                        },
+        while (attempts < maxAttempts) {
+            if (typeof gapi !== 'undefined' && typeof google !== 'undefined') {
+                break;
+            }
+            await new Promise(resolve => setTimeout(resolve, 500));
+            attempts++;
+        }
+        
+        if (typeof gapi === 'undefined') {
+            throw new Error('Google API failed to load. Please check your internet connection and refresh the page.');
+        }
+        
+        if (typeof google === 'undefined') {
+            throw new Error('Google Identity Services failed to load. Please check your internet connection and refresh the page.');
+        }
+        
+        // Initialize GAPI client
+        await new Promise((resolve, reject) => {
+            gapi.load('client', async () => {
+                try {
+                    await gapi.client.init({
+                        apiKey: API_KEY,
+                        discoveryDocs: [DISCOVERY_DOC, DISCOVERY_DRIVE],
                     });
-                    
-                    showAuthStatus('🔗 Ready to connect. Click the button to authorize Google Drive access.', 'info');
-                } else {
-                    throw new Error('Google Identity Services not loaded');
+                    resolve();
+                } catch (error) {
+                    reject(error);
                 }
             });
-        } else {
-            throw new Error('Google API not loaded');
-        }
+        });
+        
+        // Initialize token client
+        tokenClient = google.accounts.oauth2.initTokenClient({
+            client_id: CLIENT_ID,
+            scope: SCOPES,
+            callback: (tokenResponse) => {
+                isAuthenticated = true;
+                document.getElementById('authorizeBtn').innerHTML = '✅ Connected to Google Drive';
+                document.getElementById('authorizeBtn').disabled = true;
+                showAuthStatus('✅ Successfully connected to Google Drive!', 'success');
+                loadMasterProjects();
+            },
+        });
+        
+        showAuthStatus('🔗 Ready to connect. Click the button to authorize Google Drive access.', 'info');
         
     } catch (error) {
         console.error('Error initializing Google API:', error);
-        showAuthStatus('❌ Error loading Google APIs. Please refresh the page.', 'error');
+        showAuthStatus(`❌ ${error.message}`, 'error');
     }
 }
 
+function handleAuthClick() {
+    if (!isAuthenticated && tokenClient) {
+        showAuthStatus('🔄 Requesting Google Drive access...', 'info');
+        tokenClient.requestAccessToken();
+    } else if (!tokenClient) {
+        showAuthStatus('❌ Google APIs not ready. Please refresh the page.', 'error');
+    }
+}
+
+function showAuthStatus(message, type) {
+    document.getElementById('authStatus').innerHTML = `<div class="status ${type}" style="margin: 0;">${message}</div>`;
+}
         
         function showSetupInstructions() {
             const instructions = `
