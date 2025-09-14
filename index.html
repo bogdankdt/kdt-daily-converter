@@ -9,43 +9,33 @@
         
         <script src="https://accounts.google.com/gsi/client"></script>
 <script>
-// Deep investigation
 setTimeout(() => {
-    console.log('=== DEEP INVESTIGATION ===');
+    console.log('=== WHAT DO WE ACTUALLY HAVE? ===');
     
-    // Check if gapi exists under different names
-    console.log('window.gapi:', typeof window.gapi);
-    console.log('window.google:', typeof window.google);
-    console.log('this.gapi:', typeof this.gapi);
-    
-    // Look for gapi-related properties
+    // Show the actual properties
     const windowProps = Object.keys(window).filter(key => 
         key.toLowerCase().includes('gapi') || key.toLowerCase().includes('api')
     );
     console.log('Window properties with "api":', windowProps);
+    windowProps.forEach(prop => {
+        console.log(`  ${prop}:`, typeof window[prop], window[prop]);
+    });
     
-    // Check all google properties
+    // Show what's in the google object
     if (typeof window.google === 'object') {
-        console.log('google object properties:', Object.keys(window.google));
+        const googleProps = Object.keys(window.google);
+        console.log('Google object properties:', googleProps);
+        googleProps.forEach(prop => {
+            console.log(`  google.${prop}:`, typeof window.google[prop], window.google[prop]);
+        });
     }
     
-    // Check for any errors in loading
-    console.log('Any CSP errors in console?');
+    // Maybe gapi is nested somewhere?
+    if (window.google && window.google.gapi) {
+        console.log('Found google.gapi!', window.google.gapi);
+    }
     
 }, 2000);
-
-// Also try the modern approach
-setTimeout(() => {
-    console.log('=== TRYING MODERN GOOGLE API LOADER ===');
-    
-    // Try loading the newer way
-    if (typeof google !== 'undefined' && google.accounts) {
-        console.log('✅ Google object available, trying to use it differently...');
-        
-        // Maybe we can use Google Identity Services for API calls too?
-        console.log('Available google methods:', Object.keys(google));
-    }
-}, 3000);
 </script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf-lib/1.17.1/pdf-lib.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/papaparse/5.4.1/papaparse.min.js"></script>
