@@ -4,8 +4,8 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>KDT Daily CTR/Shift Ticket Converter</title>
-    <script src="https://apis.google.com/js/api.js" onload="gapiLoaded()"></script>
-    <script src="https://accounts.google.com/gsi/client" onload="gisLoaded()"></script>
+    <script src="https://apis.google.com/js/api.js"></script>
+    <script src="https://accounts.google.com/gsi/client"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf-lib/1.17.1/pdf-lib.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/papaparse/5.4.1/papaparse.min.js"></script>
     <style>
@@ -761,53 +761,54 @@
 // Initialize Google API
 async function initializeGoogleAPI() {
     try {
+        // Check credentials first
         if (CLIENT_ID.includes('YOUR_GOOGLE_CLIENT_ID')) {
-            showAuthStatus('⚠️ Please configure Google API credentials in the code. See setup instructions below.', 'error');
+            showAuthStatus('⚠️ Please configure Google API credentials in the code.', 'error');
             showSetupInstructions();
             return;
         }
         
-        showAuthStatus('🔄 Initializing Google APIs...', 'info');
+        showAuthStatus('🔄 Loading Google APIs...', 'info');
         
-        await new Promise((resolve, reject) => {
-            window.gapi.load('auth2', resolve);
-        });
+        // Wait for scripts to load
+        await new Promise(resolve => setTimeout(resolve, 2000));
         
-        await window.gapi.client.init({
-            apiKey: API_KEY,
-            clientId: CLIENT_ID,
-            discoveryDocs: [DISCOVERY_DOC, DISCOVERY_DRIVE],
-            scope: SCOPES
-        });
-        
-        tokenClient = google.accounts.oauth2.initTokenClient({
-            client_id: CLIENT_ID,
-            scope: SCOPES,
-            callback: (tokenResponse) => {
-                isAuthenticated = true;
-                document.getElementById('authorizeBtn').innerHTML = '✅ Connected to Google Drive';
-                document.getElementById('authorizeBtn').disabled = true;
-                showAuthStatus('✅ Successfully connected to Google Drive!', 'success');
-                loadMasterProjects();
-            },
-        });
-        
-        const authInstance = window.gapi.auth2.getAuthInstance();
-        if (authInstance.isSignedIn.get()) {
-            isAuthenticated = true;
-            document.getElementById('authorizeBtn').innerHTML = '✅ Connected to Google Drive';
-            document.getElementById('authorizeBtn').disabled = true;
-            showAuthStatus('✅ Already connected to Google Drive!', 'success');
-            loadMasterProjects();
+        // Initialize Google API client
+        if (typeof gapi !== 'undefined') {
+            await gapi.load('client', async () => {
+                await gapi.client.init({
+                    apiKey: API_KEY,
+                    discoveryDocs: [DISCOVERY_DOC, DISCOVERY_DRIVE],
+                });
+                
+                // Initialize token client
+                if (typeof google !== 'undefined' && google.accounts) {
+                    tokenClient = google.accounts.oauth2.initTokenClient({
+                        client_id: CLIENT_ID,
+                        scope: SCOPES,
+                        callback: (tokenResponse) => {
+                            isAuthenticated = true;
+                            document.getElementById('authorizeBtn').innerHTML = '✅ Connected to Google Drive';
+                            document.getElementById('authorizeBtn').disabled = true;
+                            showAuthStatus('✅ Successfully connected to Google Drive!', 'success');
+                            loadMasterProjects();
+                        },
+                    });
+                    
+                    showAuthStatus('🔗 Ready to connect. Click the button to authorize Google Drive access.', 'info');
+                } else {
+                    throw new Error('Google Identity Services not loaded');
+                }
+            });
         } else {
-            showAuthStatus('🔗 Ready to connect. Click the button to authorize Google Drive access.', 'info');
+            throw new Error('Google API not loaded');
         }
         
     } catch (error) {
         console.error('Error initializing Google API:', error);
-        showAuthStatus('❌ Error initializing Google APIs. Check your credentials and internet connection.', 'error');
-        showSetupInstructions();
+        showAuthStatus('❌ Error loading Google APIs. Please refresh the page.', 'error');
     }
+}
 }
         
         function showSetupInstructions() {
