@@ -6,36 +6,57 @@
     <title>KDT Daily CTR/Shift Ticket Converter</title>
 
         <!-- NEW -->
-        <script src="https://apis.google.com/js/api.js?onload=gapiLoaded&libraries=client"></script>
+        
         <script src="https://accounts.google.com/gsi/client"></script>
                        <script>
-                // GAPI loading handler
-                function gapiLoaded() {
-                    console.log('✅ GAPI loaded via callback');
-                    window.gapiReady = true;
+// Manual GAPI loading
+function loadGAPI() {
+    return new Promise((resolve, reject) => {
+        console.log('🔄 Loading GAPI manually...');
+        
+        // Create script element
+        const script = document.createElement('script');
+        script.src = 'https://apis.google.com/js/api.js';
+        script.async = true;
+        script.defer = true;
+        
+        script.onload = () => {
+            console.log('📦 GAPI script loaded');
+            // Wait a bit for gapi to be available
+            setTimeout(() => {
+                if (typeof gapi !== 'undefined') {
+                    console.log('✅ GAPI is now available');
+                    resolve();
+                } else {
+                    console.log('❌ GAPI still not available after script load');
+                    reject(new Error('GAPI not available'));
                 }
-                
-                // Check if everything is loaded
-                setTimeout(() => {
-                    console.log('=== API CHECK ===');
-                    console.log('gapi available:', typeof gapi);
-                    console.log('google available:', typeof google);
-                    console.log('google.accounts available:', typeof google?.accounts);
-                    console.log('gapiReady flag:', window.gapiReady);
-                    
-                    if (typeof gapi !== 'undefined') {
-                        console.log('✅ GAPI loaded successfully');
-                    } else {
-                        console.log('❌ GAPI still not loaded');
-                    }
-                    
-                    if (typeof google !== 'undefined' && google.accounts) {
-                        console.log('✅ Google Identity Services loaded successfully');
-                    } else {
-                        console.log('❌ Google Identity Services not loaded');
-                    }
-                }, 3000);
-                </script>
+            }, 500);
+        };
+        
+        script.onerror = () => {
+            console.log('❌ Failed to load GAPI script');
+            reject(new Error('Failed to load GAPI script'));
+        };
+        
+        document.head.appendChild(script);
+    });
+}
+
+// Test loading
+setTimeout(async () => {
+    console.log('=== STARTING MANUAL LOAD TEST ===');
+    
+    try {
+        await loadGAPI();
+        console.log('🎉 GAPI loaded successfully!');
+        console.log('gapi available:', typeof gapi);
+        console.log('google available:', typeof google);
+    } catch (error) {
+        console.log('💥 Failed to load GAPI:', error.message);
+    }
+}, 1000);
+</script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf-lib/1.17.1/pdf-lib.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/papaparse/5.4.1/papaparse.min.js"></script>
     <style>
