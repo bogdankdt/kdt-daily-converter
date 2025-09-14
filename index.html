@@ -6,29 +6,36 @@
     <title>KDT Daily CTR/Shift Ticket Converter</title>
 
         <!-- NEW -->
-        <script src="https://apis.google.com/js/api.js"></script>
+        <script src="https://apis.google.com/js/api.js?onload=gapiLoaded&libraries=client"></script>
         <script src="https://accounts.google.com/gsi/client"></script>
-        <script>
-        // Debug test - check if APIs load
-        setTimeout(() => {
-            console.log('=== API CHECK ===');
-            console.log('gapi available:', typeof gapi);
-            console.log('google available:', typeof google);
-            console.log('google.accounts available:', typeof google?.accounts);
-            
-            if (typeof gapi !== 'undefined') {
-                console.log('✅ GAPI loaded successfully');
-            } else {
-                console.log('❌ GAPI not loaded');
-            }
-            
-            if (typeof google !== 'undefined' && google.accounts) {
-                console.log('✅ Google Identity Services loaded successfully');
-            } else {
-                console.log('❌ Google Identity Services not loaded');
-            }
-        }, 3000);
-        </script>
+                       <script>
+                // GAPI loading handler
+                function gapiLoaded() {
+                    console.log('✅ GAPI loaded via callback');
+                    window.gapiReady = true;
+                }
+                
+                // Check if everything is loaded
+                setTimeout(() => {
+                    console.log('=== API CHECK ===');
+                    console.log('gapi available:', typeof gapi);
+                    console.log('google available:', typeof google);
+                    console.log('google.accounts available:', typeof google?.accounts);
+                    console.log('gapiReady flag:', window.gapiReady);
+                    
+                    if (typeof gapi !== 'undefined') {
+                        console.log('✅ GAPI loaded successfully');
+                    } else {
+                        console.log('❌ GAPI still not loaded');
+                    }
+                    
+                    if (typeof google !== 'undefined' && google.accounts) {
+                        console.log('✅ Google Identity Services loaded successfully');
+                    } else {
+                        console.log('❌ Google Identity Services not loaded');
+                    }
+                }, 3000);
+                </script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf-lib/1.17.1/pdf-lib.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/papaparse/5.4.1/papaparse.min.js"></script>
     <style>
