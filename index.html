@@ -289,7 +289,7 @@
     <div class="container">
         <div class="header">
             <div class="kdt-logo"></div>
-            <h1>KDT Daily CTR/Shift Ticket Auto-Generator v3.0</h1>
+            <h1>KDT Daily CTR/Shift Ticket Auto-Generator v4.0</h1>
             <p>Automated PDF generation with project management and team collaboration</p>
             
             <div class="mode-selector">
@@ -847,21 +847,28 @@
         }
         
         function saveProject() {
+            console.log('Save Project called');
+            
             const projectName = document.getElementById('projectNameInput').value.trim();
             const baseFolder = document.getElementById('baseFolderInput').value.trim();
             
+            console.log('Project details:', { projectName, baseFolder, timesheetData: !!timesheetData, pdfTemplates: pdfTemplates.length });
+            
             if (!projectName) {
                 showStatus('Please enter a project name.', 'error');
+                alert('Please enter a project name.');
                 return;
             }
             
             if (!timesheetData) {
                 showStatus('Please upload a timesheet first.', 'error');
+                alert('Please upload a timesheet first.');
                 return;
             }
             
             if (!pdfTemplates || pdfTemplates.length === 0) {
                 showStatus('Please upload PDF templates first.', 'error');
+                alert('Please upload at least one PDF template (CTR or Shift Ticket).');
                 return;
             }
             
@@ -869,42 +876,80 @@
             
             // Store PDF template data as base64 for persistence
             const templatePromises = pdfTemplates.map(template => {
-                return new Promise((resolve) => {
+                return new Promise((resolve, reject) => {
                     const reader = new FileReader();
                     reader.onload = function(e) {
-                        const arrayBuffer = e.target.result;
-                        const base64 = btoa(String.fromCharCode(...new Uint8Array(arrayBuffer)));
-                        resolve({
-                            name: template.name,
-                            type: template.type,
-                            data: base64
-                        });
+                        try {
+                            const arrayBuffer = e.target.result;
+                            const base64 = btoa(String.fromCharCode(...new Uint8Array(arrayBuffer)));
+                            resolve({
+                                name: template.name,
+                                type: template.type,
+                                data: base64
+                            });
+                        } catch (error) {
+                            console.error('Error converting PDF to base64:', error);
+                            reject(error);
+                        }
+                    };
+                    reader.onerror = function(error) {
+                        console.error('FileReader error:', error);
+                        reject(error);
                     };
                     reader.readAsArrayBuffer(template.file);
                 });
             });
             
             Promise.all(templatePromises).then(templateData => {
+                console.log('Templates converted successfully');
+                
+                if (!currentProject) {
+                    currentProject = {
+                        created: new Date().toISOString()
+                    };
+                }
+                
                 currentProject.name = projectName;
                 currentProject.baseFolder = baseFolder;
                 currentProject.pdfTemplateData = templateData;
+                currentProject.timesheetData = timesheetData;
                 currentProject.updated = new Date().toISOString();
+                
+                // Load existing projects first
+                const savedProjects = localStorage.getItem('kdtProjects');
+                projects = savedProjects ? JSON.parse(savedProjects) : [];
                 
                 const existingIndex = projects.findIndex(p => p.name === projectName);
                 if (existingIndex >= 0) {
                     projects[existingIndex] = currentProject;
+                    console.log('Updated existing project at index:', existingIndex);
                 } else {
                     projects.push(currentProject);
+                    console.log('Added new project, total projects:', projects.length);
                 }
                 
-                localStorage.setItem('kdtProjects', JSON.stringify(projects));
-                renderProjectList();
-                
-                showStatus(`Project "${projectName}" saved successfully!`, 'success');
-                alert(`Project "${projectName}" has been saved successfully!`);
+                try {
+                    localStorage.setItem('kdtProjects', JSON.stringify(projects));
+                    console.log('Projects saved to localStorage successfully');
+                    
+                    // Verify save
+                    const verification = localStorage.getItem('kdtProjects');
+                    const verifiedProjects = JSON.parse(verification);
+                    console.log('Verification - Projects in storage:', verifiedProjects.length);
+                    
+                    renderProjectList();
+                    showStatus(`Project "${projectName}" saved successfully!`, 'success');
+                    alert(`Project "${projectName}" has been saved successfully!\n\nYou can now switch to User Mode to generate PDFs.`);
+                    
+                } catch (storageError) {
+                    console.error('LocalStorage error:', storageError);
+                    showStatus('Error saving to browser storage. The project data might be too large.', 'error');
+                    alert('Error saving project. Try reducing the size of your files or clear browser storage.');
+                }
             }).catch(error => {
                 console.error('Error saving project:', error);
                 showStatus('Error saving project: ' + error.message, 'error');
+                alert('Error saving project: ' + error.message);
             });
         }
         
@@ -1237,6 +1282,3 @@
             document.body.removeChild(a);
             URL.revokeObjectURL(url);
         }
-    </script>
-</body>
-</html>
