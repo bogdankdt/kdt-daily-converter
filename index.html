@@ -1144,45 +1144,79 @@
             }
         }
         
-        async function generateCTRPDF(fireName, userName) {
-            const ctrTemplate = pdfTemplates.find(t => t.type === 'ctr');
-            if (!ctrTemplate) return;
+        async function generateCTRPDF(fireName, userName, template = null) {
+            const ctrTemplate = template || pdfTemplates.find(t => t.type === 'ctr');
+            if (!ctrTemplate || !ctrTemplate.file) {
+                throw new Error('CTR template not found or invalid');
+            }
             
             const arrayBuffer = await ctrTemplate.file.arrayBuffer();
             const pdfDoc = await PDFLib.PDFDocument.load(arrayBuffer);
             const form = pdfDoc.getForm();
+            const fields = form.getFields();
             
-            // Fill basic fields
             const dateStr = selectedDay.date instanceof Date ? 
                 selectedDay.date.toLocaleDateString() : 
                 new Date(selectedDay.date).toLocaleDateString();
             
-            try {
-                // Fill header fields
-                form.getTextField('crew_name').setText('Knight Division Tactical');
-                form.getTextField('fire_name').setText(fireName);
-                form.getTextField('date').setText(dateStr);
-            } catch (e) {
-                console.warn('Some CTR fields not found:', e);
-            }
-            
-            // Fill employee data
+            // Get day employees
             const dayEmployees = timesheetData.employees.filter(emp => {
                 const worked = emp.rowData[selectedDay.workedCol];
                 return worked >= 8 && worked <= 16;
             });
             
-            dayEmployees.forEach((emp, index) => {
+            // Try to fill common CTR fields
+            const fieldMap = {
+                'crew_name': 'Knight Division Tactical',
+                'fire_name': fireName,
+                'incident_name': fireName,
+                'date': dateStr
+            };
+            
+            fields.forEach(field => {
+                const fieldName = field.getName().toLowerCase();
                 try {
-                    if (index < 20) { // Assuming 20 rows available
-                        form.getTextField(`name_${index + 1}`).setText(emp.name);
-                        form.getTextField(`classification_${index + 1}`).setText(emp.classification);
-                        form.getTextField(`date_on_${index + 1}`).setText(dateStr);
-                        form.getTextField(`date_off_${index + 1}`).setText(dateStr);
+                    if (fieldMap[fieldName]) {
+                        if (field.constructor.name === 'PDFTextField') {
+                            field.setText(fieldMap[fieldName]);
+                        }
                     }
                 } catch (e) {
-                    console.warn(`CTR field not found for row ${index + 1}`);
+                    console.warn(`Could not fill field ${field.getName()}:`, e);
                 }
+            });
+            
+            // Fill employee rows - try common field patterns
+            dayEmployees.forEach((emp, index) => {
+                const rowNum = index + 1;
+                const possibleNameFields = [
+                    `name_${rowNum}`, `employee_${rowNum}`, `name${rowNum}`, 
+                    `employee_name_${rowNum}`, `NAME_${rowNum}`
+                ];
+                const possibleClassFields = [
+                    `classification_${rowNum}`, `class_${rowNum}`, `type_${rowNum}`,
+                    `position_${rowNum}`, `CLASSIFICATION_${rowNum}`
+                ];
+                const possibleDateFields = [
+                    `date_on_${rowNum}`, `start_date_${rowNum}`, `date_start_${rowNum}`,
+                    `DATE_ON_${rowNum}`, `date_off_${rowNum}`, `end_date_${rowNum}`
+                ];
+                
+                fields.forEach(field => {
+                    const fieldName = field.getName().toLowerCase();
+                    
+                    try {
+                        if (possibleNameFields.includes(fieldName)) {
+                            field.setText(emp.name);
+                        } else if (possibleClassFields.includes(fieldName)) {
+                            field.setText(emp.classification);
+                        } else if (possibleDateFields.includes(fieldName)) {
+                            field.setText(dateStr);
+                        }
+                    } catch (e) {
+                        console.warn(`Could not fill field ${field.getName()}:`, e);
+                    }
+                });
             });
             
             const pdfBytes = await pdfDoc.save();
@@ -1190,13 +1224,16 @@
             downloadPDF(pdfBytes, filename);
         }
         
-        async function generateShiftTicketPDF(fireName, userName) {
-            const shiftTemplate = pdfTemplates.find(t => t.type === 'shift');
-            if (!shiftTemplate) return;
+        async function generateShiftTicketPDF(fireName, userName, template = null) {
+            const shiftTemplate = template || pdfTemplates.find(t => t.type === 'shift');
+            if (!shiftTemplate || !shiftTemplate.file) {
+                throw new Error('Shift Ticket template not found or invalid');
+            }
             
             const arrayBuffer = await shiftTemplate.file.arrayBuffer();
             const pdfDoc = await PDFLib.PDFDocument.load(arrayBuffer);
             const form = pdfDoc.getForm();
+            const fields = form.getFields();
             
             const dateStr = selectedDay.date instanceof Date ? 
                 selectedDay.date.toLocaleDateString() : 
@@ -1213,15 +1250,43 @@
                 return sum + (emp.rowData[selectedDay.milesCol] || 0);
             }, 0);
             
-            try {
-                // Fill basic fields
-                form.getTextField('contractor_agency').setText('Knight Division Tactical');
-                form.getTextField('incident_name').setText(fireName);
-                form.getTextField('date').setText(dateStr);
-                form.getTextField('total_hours').setText(totalPeople.toString());
-                form.getTextField('miles_quantity').setText(totalMiles.toString());
-                form.getTextField('operator_name').setText('KDT');
-                form.getTextField('total').setText(totalPeople.toString());
+            // Common field mappings for shift tickets
+            const fieldMap = {
+                'contractor_agency': 'Knight Division Tactical',
+                'contractor/agency name': 'Knight Division Tactical',
+                'incident_name': fireName,
+                'fire_name': fireName,
+                'date': dateStr,
+                'total_hours': totalPeople.toString(),
+                'total': totalPeople.toString(),
+                'miles_quantity': totalMiles.toString(),
+                'operator_name': 'KDT',
+                'operator name (first & last)': 'KDT'
+            };
+            
+            fields.forEach(field => {
+                const fieldName = field.getName().toLowerCase();
+                
+                try {
+                    if (fieldMap[fieldName]) {
+                        if (field.constructor.name === 'PDFTextField') {
+                            field.setText(fieldMap[fieldName]);
+                        }
+                    }
+                    
+                    // Check miles checkbox
+                    if (fieldName.includes('miles') && field.constructor.name === 'PDFCheckBox') {
+                        field.check();
+                    }
+                } catch (e) {
+                    console.warn(`Could not fill field ${field.getName()}:`, e);
+                }
+            });
+            
+            const pdfBytes = await pdfDoc.save();
+            const filename = `${fireName}_${userName}_ShiftTicket_${dateStr.replace(/\//g, '-')}.pdf`;
+            downloadPDF(pdfBytes, filename);
+        }                form.getTextField('total').setText(totalPeople.toString());
                 
                 // Check the miles checkbox
                 form.getCheckBox('miles_checkbox').check();
@@ -1233,6 +1298,146 @@
             const pdfBytes = await pdfDoc.save();
             const filename = `${fireName}_${userName}_ShiftTicket_${dateStr.replace(/\//g, '-')}.pdf`;
             downloadPDF(pdfBytes, filename);
+        }
+        
+        async function generatePDFs() {
+            if (!selectedDay) {
+                showStatus('Please select a day first.', 'error');
+                return;
+            }
+            
+            try {
+                showStatus('Generating PDFs...', 'info');
+                
+                const fireName = document.getElementById('fireNameInput').value;
+                const userName = document.getElementById('userNameInput').value;
+                
+                // Generate CTR PDF
+                const ctrTemplate = pdfTemplates.find(t => t.type === 'ctr');
+                if (ctrTemplate) {
+                    await generateCTRPDF(fireName, userName, ctrTemplate);
+                }
+                
+                // Generate Shift Ticket PDF
+                const shiftTemplate = pdfTemplates.find(t => t.type === 'shift');
+                if (shiftTemplate) {
+                    await generateShiftTicketPDF(fireName, userName, shiftTemplate);
+                }
+                
+                showStatus('PDFs generated and downloaded successfully!', 'success');
+                
+            } catch (error) {
+                console.error('Error generating PDFs:', error);
+                showStatus('Error generating PDFs: ' + error.message, 'error');
+            }
+        }
+        
+        function loadProject(index) {
+            currentProject = projects[index];
+            document.getElementById('projectSetupStep').style.display = 'block';
+            document.getElementById('currentProjectName').textContent = currentProject.name;
+            document.getElementById('projectNameInput').value = currentProject.name;
+            document.getElementById('baseFolderInput').value = currentProject.baseFolder || '';
+            
+            if (currentProject.timesheetData) {
+                timesheetData = currentProject.timesheetData;
+                displayTimesheetPreview();
+                document.getElementById('pdfTemplateStep').style.display = 'block';
+            }
+            
+            if (currentProject.pdfTemplateData) {
+                pdfTemplates = currentProject.pdfTemplateData.map(templateData => ({
+                    name: templateData.name,
+                    type: templateData.type,
+                    file: base64ToFile(templateData.data, templateData.name)
+                }));
+                displayPDFPreview();
+            }
+        }
+        
+        function processTimesheetData(jsonData) {
+            // Extract fire name from header
+            const fireName = jsonData[0] && jsonData[0][1] ? jsonData[0][1] : 'Unknown Fire';
+            
+            // Extract dates from row 4 (index 3)
+            const dateRow = jsonData[3];
+            const dates = [];
+            
+            // Parse date columns (every 2 columns starting from index 4)
+            for (let i = 4; i < dateRow.length; i += 2) {
+                if (dateRow[i] && dateRow[i + 1]) {
+                    dates.push({
+                        dayName: dateRow[i],
+                        date: dateRow[i + 1],
+                        workedCol: i,
+                        milesCol: i + 1
+                    });
+                }
+            }
+            
+            // Extract employee data - filter out empty rows and section headers
+            const employees = [];
+            
+            for (let i = 5; i < jsonData.length; i++) {
+                const row = jsonData[i];
+                if (!row || !row[0] || typeof row[0] !== 'string') continue;
+                
+                const name = row[0].trim();
+                
+                // Skip header/total rows and empty names
+                if (!name || 
+                    name.toLowerCase().includes('total') || 
+                    name.toLowerCase().includes('combined') ||
+                    name === 'GUARDS' || name === 'MANAGER' || name === 'SUPERVISORS' ||
+                    name.toLowerCase().includes('charge') ||
+                    name.toLowerCase().includes('daily') ||
+                    name === '') {
+                    continue;
+                }
+                
+                // Determine classification based on context
+                let classification = 'Guard';
+                for (let j = i - 1; j >= 0; j--) {
+                    const prevRow = jsonData[j];
+                    if (prevRow && prevRow[0]) {
+                        const prevName = String(prevRow[0]).toLowerCase();
+                        if (prevName.includes('manager')) {
+                            classification = 'Manager';
+                            break;
+                        } else if (prevName.includes('supervisor')) {
+                            classification = 'Supervisor';
+                            break;
+                        } else if (prevName.includes('guard')) {
+                            classification = 'Guard';
+                            break;
+                        }
+                    }
+                }
+                
+                // Only add if there's actual data (at least one worked hour)
+                let hasData = false;
+                for (let col = 4; col < row.length; col += 2) {
+                    if (row[col] && row[col] > 0) {
+                        hasData = true;
+                        break;
+                    }
+                }
+                
+                if (hasData) {
+                    employees.push({
+                        name: name,
+                        classification: classification,
+                        rowData: row
+                    });
+                }
+            }
+            
+            return {
+                fireName: fireName,
+                dates: dates,
+                employees: employees,
+                rawData: jsonData
+            };
         }
         
         function downloadPDF(pdfBytes, filename) {
