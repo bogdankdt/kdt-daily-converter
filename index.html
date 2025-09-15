@@ -575,6 +575,42 @@
             showStatus('KDT Auto-Generator ready! Connect to Google Drive to start.', 'info');
         });
         
+        function initializeGoogleAPI() {
+            showAuthStatus('Loading Google APIs...', 'info');
+            
+            const checkGoogle = () => {
+                if (typeof google !== 'undefined' && google.accounts) {
+                    tokenClient = google.accounts.oauth2.initTokenClient({
+                        client_id: CLIENT_ID,
+                        scope: SCOPES,
+                        callback: (tokenResponse) => {
+                            isAuthenticated = true;
+                            accessToken = tokenResponse.access_token;
+                            
+                            document.getElementById('authorizeBtn').innerHTML = 'Connected to Google Drive';
+                            document.getElementById('authorizeBtn').disabled = true;
+                            showAuthStatus('Successfully connected to Google Drive!', 'success');
+                        },
+                    });
+                    
+                    showAuthStatus('Ready to connect. Click the button to authorize Google Drive access.', 'info');
+                } else {
+                    setTimeout(checkGoogle, 100);
+                }
+            };
+            
+            checkGoogle();
+        }
+        
+        function showAuthStatus(message, type) {
+            document.getElementById('authStatus').innerHTML = `<div class="status ${type}" style="margin: 0;">${message}</div>`;
+        }
+        
+        function setupEventListeners() {
+            document.getElementById('timesheetFile').addEventListener('change', handleTimesheetUpload);
+            document.getElementById('pdfFile').addEventListener('change', handlePDFUpload);
+        }
+        
         function switchMode(mode) {
             currentMode = mode;
             
