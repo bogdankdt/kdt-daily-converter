@@ -213,6 +213,10 @@
             color: #212529;
         }
         
+        .btn-info {
+            background: #17a2b8;
+        }
+        
         .status {
             padding: 15px;
             border-radius: 12px;
@@ -367,6 +371,19 @@
             color: #2d4a3e;
         }
         
+        .pdf-selector {
+            display: flex;
+            gap: 15px;
+            margin: 20px 0;
+            flex-wrap: wrap;
+        }
+        
+        .pdf-option {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+        
         @media (max-width: 768px) {
             .content {
                 padding: 20px;
@@ -378,6 +395,10 @@
             
             .day-grid {
                 grid-template-columns: 1fr;
+            }
+            
+            .pdf-selector {
+                flex-direction: column;
             }
         }
     </style>
@@ -456,25 +477,18 @@
                     </div>
                     
                     <div style="margin-bottom: 20px;">
-                        <label style="display: block; font-weight: 600; margin-bottom: 8px;">Timesheet File:</label>
+                        <label style="display: block; font-weight: 600; margin-bottom: 8px;">Timesheet Template:</label>
                         <div class="file-input" id="timesheetInput">
                             <input type="file" id="timesheetFile" accept=".xlsx,.xls" />
                             <label for="timesheetFile" class="file-input-label">
                                 <div style="font-size: 2rem; margin-bottom: 10px;">📊</div>
-                                <div><strong>Upload KDT Timesheet (Excel format)</strong></div>
+                                <div><strong>Upload KDT Timesheet Template (Excel format)</strong></div>
                                 <div style="color: #a0aec0; margin-top: 5px;">Or drag and drop here</div>
                             </label>
                         </div>
                     </div>
                     
                     <div id="timesheetPreview"></div>
-                    
-                    <div id="employeeListContainer" style="display: none;">
-                        <h4>Employee List</h4>
-                        <div class="employee-list" id="employeeList">
-                            <!-- Employees will be listed here -->
-                        </div>
-                    </div>
                 </div>
                 
                 <!-- PDF Template Upload -->
@@ -489,7 +503,7 @@
                             <input type="file" id="pdfFile" accept=".pdf" multiple />
                             <label for="pdfFile" class="file-input-label">
                                 <div style="font-size: 2rem; margin-bottom: 10px;">📋</div>
-                                <div><strong>Upload CTR and Shift Ticket PDFs</strong></div>
+                                <div><strong>Upload CTR and Shift Ticket PDF Templates</strong></div>
                                 <div style="color: #a0aec0; margin-top: 5px;">Or drag and drop here</div>
                             </label>
                         </div>
@@ -499,13 +513,6 @@
                     </div>
                     
                     <div id="pdfFormsPreview"></div>
-                    
-                    <div id="pdfMappingSection" style="display: none; margin-top: 20px;">
-                        <h4>PDF Field Mapping</h4>
-                        <p style="color: #718096; margin-bottom: 15px;">Review and confirm the detected field mappings for your PDF templates.</p>
-                        
-                        <div id="pdfMappingPreview"></div>
-                    </div>
                     
                     <div style="margin-top: 20px;">
                         <button onclick="saveProject()" class="btn-success">
@@ -562,6 +569,17 @@
                             <h4>Employees for Selected Day</h4>
                             <div class="employee-list" id="employeeDayListContent">
                                 <!-- Employees for selected day will be listed here -->
+                            </div>
+                        </div>
+                        
+                        <div class="pdf-selector">
+                            <div class="pdf-option">
+                                <input type="checkbox" id="generateCTR" checked>
+                                <label for="generateCTR">Generate CTR</label>
+                            </div>
+                            <div class="pdf-option">
+                                <input type="checkbox" id="generateShift" checked>
+                                <label for="generateShift">Generate Shift Ticket</label>
                             </div>
                         </div>
                         
@@ -752,9 +770,7 @@
             document.getElementById('projectNameInput').value = '';
             document.getElementById('baseFolderInput').value = '';
             document.getElementById('timesheetPreview').innerHTML = '';
-            document.getElementById('employeeListContainer').style.display = 'none';
             document.getElementById('pdfTemplateStep').style.display = 'none';
-            document.getElementById('pdfMappingSection').style.display = 'none';
             
             // Scroll to project setup
             document.getElementById('projectSetupStep').scrollIntoView({ behavior: 'smooth' });
@@ -789,8 +805,6 @@
                     file: base64ToFile(templateData.data, templateData.name)
                 }));
                 displayPDFPreview();
-                document.getElementById('pdfMappingSection').style.display = 'block';
-                displayPDFMapping();
             }
             
             // Scroll to project setup
@@ -945,41 +959,7 @@
             });
             
             html += '</div></div>';
-            
-            // Add employee list
-            html += `
-                <div style="margin-top: 20px;">
-                    <button onclick="toggleEmployeeList()" class="btn-warning" style="width: auto; padding: 10px 15px;">
-                        View Employee List
-                    </button>
-                </div>
-            `;
-            
             preview.innerHTML = html;
-        }
-        
-        function toggleEmployeeList() {
-            const container = document.getElementById('employeeListContainer');
-            const list = document.getElementById('employeeList');
-            
-            if (container.style.display === 'none') {
-                let html = '';
-                timesheetData.employees.forEach(emp => {
-                    html += `
-                        <div class="employee-item">
-                            <div>
-                                <div class="employee-name">${emp.name}</div>
-                                <div class="employee-class">${emp.classification}</div>
-                            </div>
-                            <div class="employee-hours">8+ hrs</div>
-                        </div>
-                    `;
-                });
-                list.innerHTML = html;
-                container.style.display = 'block';
-            } else {
-                container.style.display = 'none';
-            }
         }
         
         // PDF Template Handling
@@ -998,8 +978,6 @@
             });
             
             displayPDFPreview();
-            document.getElementById('pdfMappingSection').style.display = 'block';
-            displayPDFMapping();
         }
         
         function displayPDFPreview() {
@@ -1025,51 +1003,10 @@
             preview.innerHTML = html;
         }
         
-        function displayPDFMapping() {
-            const mappingPreview = document.getElementById('pdfMappingPreview');
-            let html = `
-                <div style="background: #f8f9fa; padding: 20px; border-radius: 8px;">
-                    <p style="color: #718096; margin-bottom: 15px;">The system will automatically map data to these fields in your PDF templates:</p>
-                    <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 15px;">
-            `;
-            
-            // Add field mapping information
-            const fields = [
-                { field: 'Fire Name', mapping: 'Fire/Incident name fields' },
-                { field: 'Date', mapping: 'Date fields' },
-                { field: 'Contractor/Agency', mapping: '"Knight Division Tactical"' },
-                { field: 'Operator', mapping: '"KDT"' },
-                { field: 'Employee Names', mapping: 'Numbered name fields (Name1, Name2, etc.)' },
-                { field: 'Classifications', mapping: 'Numbered classification fields' },
-                { field: 'Total People', mapping: 'Total hours/people fields' },
-                { field: 'Total Miles', mapping: 'Miles quantity fields' }
-            ];
-            
-            fields.forEach(item => {
-                html += `
-                    <div style="background: white; padding: 10px; border-radius: 6px;">
-                        <strong>${item.field}</strong>
-                        <div style="color: #718096; font-size: 0.9rem;">→ ${item.mapping}</div>
-                    </div>
-                `;
-            });
-            
-            html += `
-                    </div>
-                    <p style="color: #718096; margin-top: 15px; font-style: italic;">
-                        Note: If your PDF forms use different field names, you may need to manually adjust the mapping in the PDF templates.
-                    </p>
-                </div>
-            `;
-            
-            mappingPreview.innerHTML = html;
-        }
-        
         function clearAllForms() {
             pdfTemplates = [];
             document.getElementById('pdfFile').value = '';
             displayPDFPreview();
-            document.getElementById('pdfMappingSection').style.display = 'none';
             showStatus('PDF templates cleared.', 'info');
         }
         
@@ -1350,16 +1287,31 @@
                 return;
             }
             
+            const generateCTR = document.getElementById('generateCTR').checked;
+            const generateShift = document.getElementById('generateShift').checked;
+            
+            if (!generateCTR && !generateShift) {
+                showStatus('Please select at least one PDF to generate.', 'error');
+                return;
+            }
+            
             showStatus('Generating PDFs...', 'info');
             
             // Disable generate button during processing
             document.getElementById('generateBtn').disabled = true;
             document.getElementById('generateBtn').innerHTML = 'Generating...';
             
-            Promise.all([
-                generateCTRPDF(fireName, userName),
-                generateShiftTicketPDF(fireName, userName)
-            ]).then(() => {
+            const promises = [];
+            
+            if (generateCTR) {
+                promises.push(generateCTRPDF(fireName, userName));
+            }
+            
+            if (generateShift) {
+                promises.push(generateShiftTicketPDF(fireName, userName));
+            }
+            
+            Promise.all(promises).then(() => {
                 showStatus('PDFs generated and downloaded successfully!', 'success');
                 document.getElementById('generateBtn').disabled = false;
                 document.getElementById('generateBtn').innerHTML = 'Generate & Download PDFs';
@@ -1395,6 +1347,13 @@
                             return worked >= 8 && worked <= 16;
                         });
                         
+                        // Map classification to ACL titles
+                        const classificationMap = {
+                            'Guard': 'ACL Liaison',
+                            'Manager': 'ACL Manager',
+                            'Supervisor': 'ACL Supervisor'
+                        };
+                        
                         // Fill basic fields
                         fields.forEach(field => {
                             const fieldName = field.getName().toLowerCase();
@@ -1406,32 +1365,90 @@
                                     field.setText(fireName);
                                 } else if (fieldName.includes('date')) {
                                     field.setText(dateStr);
+                                } else if (fieldName.includes('crew number')) {
+                                    // Extract RO number from timesheet if available
+                                    const roNumber = timesheetData.rawData[59] && timesheetData.rawData[59][11] ? 
+                                        timesheetData.rawData[59][11] : 'RO_12345';
+                                    field.setText(roNumber);
+                                } else if (fieldName.includes('fire number')) {
+                                    // Extract incident number from timesheet if available
+                                    const incidentNumber = timesheetData.rawData[58] && timesheetData.rawData[58][11] ? 
+                                        timesheetData.rawData[58][11] : 'Incident_12345';
+                                    field.setText(incidentNumber);
                                 }
                             } catch (e) {
                                 console.warn(`Could not fill field ${field.getName()}`);
                             }
                         });
                         
-                        // Fill employee data
+                        // Fill employee data - map to available fields
                         dayEmployees.forEach((emp, index) => {
+                            // Convert classification to ACL title
+                            const aclClassification = classificationMap[emp.classification] || emp.classification;
+                            
+                            // Try to find fields for this employee
+                            let nameField = null;
+                            let classField = null;
+                            let dateField = null;
+                            
                             fields.forEach(field => {
                                 const fieldName = field.getName().toLowerCase();
                                 
-                                try {
-                                    if (fieldName.includes(`${index + 1}`) || fieldName.includes(`_${index + 1}`)) {
-                                        if (fieldName.includes('name')) {
-                                            field.setText(emp.name);
-                                        } else if (fieldName.includes('class')) {
-                                            field.setText(emp.classification);
-                                        } else if (fieldName.includes('date')) {
-                                            field.setText(dateStr);
-                                        }
+                                // Look for field patterns like "text1", "text2", etc.
+                                if (fieldName.includes(`${index + 1}`) || fieldName.includes(`_${index + 1}`)) {
+                                    if (fieldName.includes('name') || (!fieldName.includes('class') && !fieldName.includes('date'))) {
+                                        nameField = field;
+                                    } else if (fieldName.includes('class')) {
+                                        classField = field;
+                                    } else if (fieldName.includes('date')) {
+                                        dateField = field;
                                     }
-                                } catch (e) {
-                                    console.warn(`Could not fill employee field ${field.getName()}`);
                                 }
                             });
+                            
+                            // Fill the fields if found
+                            if (nameField) {
+                                try {
+                                    nameField.setText(emp.name);
+                                } catch (e) {
+                                    console.warn(`Could not set name for ${emp.name}`);
+                                }
+                            }
+                            
+                            if (classField) {
+                                try {
+                                    classField.setText(aclClassification);
+                                } catch (e) {
+                                    console.warn(`Could not set class for ${emp.name}`);
+                                }
+                            }
+                            
+                            if (dateField) {
+                                try {
+                                    dateField.setText(dateStr);
+                                } catch (e) {
+                                    console.warn(`Could not set date for ${emp.name}`);
+                                }
+                            }
                         });
+                        
+                        // Fill any remaining fields with placeholders
+                        for (let i = dayEmployees.length; i < 20; i++) {
+                            fields.forEach(field => {
+                                const fieldName = field.getName().toLowerCase();
+                                if (fieldName.includes(`${i + 1}`) || fieldName.includes(`_${i + 1}`)) {
+                                    try {
+                                        if (fieldName.includes('name') || (!fieldName.includes('class') && !fieldName.includes('date'))) {
+                                            field.setText(`Name${i+1}+`);
+                                        } else if (fieldName.includes('class')) {
+                                            field.setText(`Classification${i+1}+`);
+                                        }
+                                    } catch (e) {
+                                        // Ignore errors for placeholder fields
+                                    }
+                                }
+                            });
+                        }
                         
                         const pdfBytes = await pdfDoc.save();
                         const filename = `${fireName}_${userName}_CTR_${dateStr.replace(/\//g, '-')}.pdf`;
@@ -1469,11 +1486,18 @@
                             return worked >= 8 && worked <= 16;
                         });
                         
+                        // Count employees by classification
+                        const counts = { Guard: 0, Manager: 0, Supervisor: 0 };
+                        dayEmployees.forEach(emp => {
+                            counts[emp.classification]++;
+                        });
+                        
                         const totalPeople = dayEmployees.length;
                         const totalMiles = dayEmployees.reduce((sum, emp) => {
                             return sum + (emp.rowData[selectedDay.milesCol] || 0);
                         }, 0);
                         
+                        // Fill fields based on field names and patterns
                         fields.forEach(field => {
                             const fieldName = field.getName().toLowerCase();
                             
@@ -1484,6 +1508,21 @@
                                     field.setText(fireName);
                                 } else if (fieldName.includes('date')) {
                                     field.setText(dateStr);
+                                } else if (fieldName.includes('resource order')) {
+                                    // Extract RO number from timesheet if available
+                                    const roNumber = timesheetData.rawData[59] && timesheetData.rawData[59][11] ? 
+                                        timesheetData.rawData[59][11] : 'RO_12345';
+                                    field.setText(roNumber);
+                                } else if (fieldName.includes('incident number')) {
+                                    // Extract incident number from timesheet if available
+                                    const incidentNumber = timesheetData.rawData[58] && timesheetData.rawData[58][11] ? 
+                                        timesheetData.rawData[58][11] : 'Incident_12345';
+                                    field.setText(incidentNumber);
+                                } else if (fieldName.includes('agreement number')) {
+                                    // Extract agreement number from timesheet if available
+                                    const agreementNumber = timesheetData.rawData[60] && timesheetData.rawData[60][11] ? 
+                                        timesheetData.rawData[60][11] : '140L372';
+                                    field.setText(agreementNumber);
                                 } else if (fieldName.includes('total') && fieldName.includes('hour')) {
                                     field.setText(totalPeople.toString());
                                 } else if (fieldName.includes('miles') && fieldName.includes('quantity')) {
@@ -1494,6 +1533,12 @@
                                     field.setText(totalPeople.toString());
                                 }
                                 
+                                // Set hours to "12 Hours" for all employees
+                                if (fieldName.includes('hour') && field.constructor.name !== 'PDFCheckBox') {
+                                    field.setText('12 Hours');
+                                }
+                                
+                                // Check the miles checkbox
                                 if (fieldName.includes('miles') && field.constructor.name === 'PDFCheckBox') {
                                     field.check();
                                 }
