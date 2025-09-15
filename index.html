@@ -5,6 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>KDT Daily CTR/Shift Ticket Auto-Generator</title>
     <script src="https://accounts.google.com/gsi/client"></script>
+    <script src="https://apis.google.com/js/api.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf-lib/1.17.1/pdf-lib.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
     <style>
@@ -161,6 +162,11 @@
             box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
         }
         
+        .active-project-card {
+            background: linear-gradient(135deg, #e8f5e8, #f0f8f0);
+            border: 2px solid #5a6c57;
+        }
+        
         input, select, button, textarea {
             width: 100%;
             padding: 15px;
@@ -206,6 +212,10 @@
         
         .btn-danger {
             background: #dc3545;
+        }
+        
+        .btn-info {
+            background: linear-gradient(135deg, #17a2b8, #20c9c9);
         }
         
         .status {
@@ -274,6 +284,20 @@
             display: block;
         }
         
+        .loading {
+            display: inline-block;
+            width: 20px;
+            height: 20px;
+            border: 3px solid rgba(0,0,0,.1);
+            border-radius: 50%;
+            border-top-color: #5a6c57;
+            animation: spin 1s ease-in-out infinite;
+        }
+        
+        @keyframes spin {
+            to { transform: rotate(360deg); }
+        }
+        
         @media (max-width: 768px) {
             .content {
                 padding: 20px;
@@ -289,8 +313,8 @@
     <div class="container">
         <div class="header">
             <div class="kdt-logo"></div>
-            <h1>KDT Daily CTR/Shift Ticket Auto-Generator v4.0</h1>
-            <p>Automated PDF generation with project management and team collaboration</p>
+            <h1>KDT Daily CTR/Shift Ticket Auto-Generator v5.0</h1>
+            <p>Google Sheets Integration for Live Data Management</p>
             
             <div class="mode-selector">
                 <button class="mode-btn active" onclick="switchMode('admin', this)">Admin Mode</button>
@@ -303,69 +327,63 @@
             <div class="step">
                 <div class="step-title">
                     <div class="step-number">🔑</div>
-                    Google Drive Authentication
+                    Google Drive & Sheets Authentication
                 </div>
-                <p style="margin-bottom: 20px; color: #718096;">Connect to Google Drive to access sheets and manage project files.</p>
+                <p style="margin-bottom: 20px; color: #718096;">Connect to Google to manage templates and generate PDFs from live spreadsheet data.</p>
                 
                 <div style="display: grid; grid-template-columns: 1fr auto; gap: 15px; align-items: center;">
                     <div id="authStatus">
-                        <div style="color: #718096;">Not connected to Google Drive</div>
+                        <div style="color: #718096;">Not connected to Google</div>
                     </div>
                     <button id="authorizeBtn" onclick="handleAuthClick()" style="width: auto; padding: 15px 25px;">
-                        🔗 Connect Google Drive
+                        🔗 Connect Google Account
                     </button>
                 </div>
             </div>
             
             <!-- Admin Mode -->
             <div id="adminMode" class="mode-section active">
-                <!-- Project Management -->
+                <!-- Template Management -->
                 <div class="step">
                     <div class="step-title">
                         <div class="step-number">📁</div>
-                        Project Management
+                        Template Management
                     </div>
                     
                     <div class="project-panel">
                         <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 15px;">
-                            <h3>Your Projects</h3>
-                            <button onclick="createNewProject()" style="width: auto; padding: 10px 20px;">
-                                Create New Project
+                            <h3>Project Templates</h3>
+                            <button onclick="createNewTemplate()" style="width: auto; padding: 10px 20px;">
+                                Create New Template
                             </button>
                         </div>
                         
-                        <div id="projectList" class="project-list">
-                            <!-- Projects will be loaded here -->
+                        <div id="templateList" class="project-list">
+                            <!-- Templates will be loaded here -->
                         </div>
                     </div>
                 </div>
                 
-                <!-- Project Setup -->
-                <div class="step" id="projectSetupStep" style="display: none;">
+                <!-- Template Setup -->
+                <div class="step" id="templateSetupStep" style="display: none;">
                     <div class="step-title">
                         <div class="step-number">⚙️</div>
-                        Project Setup: <span id="currentProjectName">New Project</span>
-                    </div>
-                    
-                    <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 20px; margin-bottom: 20px;">
-                        <div>
-                            <label style="display: block; font-weight: 600; margin-bottom: 8px;">Project Name:</label>
-                            <input type="text" id="projectNameInput" placeholder="Enter project name">
-                        </div>
-                        <div>
-                            <label style="display: block; font-weight: 600; margin-bottom: 8px;">Base Folder (Google Drive):</label>
-                            <input type="text" id="baseFolderInput" placeholder="Enter base folder name">
-                        </div>
+                        Template Setup: <span id="currentTemplateName">New Template</span>
                     </div>
                     
                     <div style="margin-bottom: 20px;">
-                        <label style="display: block; font-weight: 600; margin-bottom: 8px;">Timesheet File:</label>
+                        <label style="display: block; font-weight: 600; margin-bottom: 8px;">Template Name:</label>
+                        <input type="text" id="templateNameInput" placeholder="Enter template name (e.g., 2024 Fire Season)">
+                    </div>
+                    
+                    <div style="margin-bottom: 20px;">
+                        <label style="display: block; font-weight: 600; margin-bottom: 8px;">Timesheet Template (Excel):</label>
                         <div class="file-input" id="timesheetInput">
-                            <input type="file" id="timesheetFile" accept=".xlsx,.xls" onchange="handleTimesheetUpload(event)" />
+                            <input type="file" id="timesheetFile" accept=".xlsx,.xls" onchange="handleTimesheetTemplateUpload(event)" />
                             <label for="timesheetFile" class="file-input-label">
                                 <div style="font-size: 2rem; margin-bottom: 10px;">📊</div>
-                                <div><strong>Upload KDT Timesheet (Excel format)</strong></div>
-                                <div style="color: #a0aec0; margin-top: 5px;">Or drag and drop here</div>
+                                <div><strong>Upload BLANK Timesheet Template</strong></div>
+                                <div style="color: #a0aec0; margin-top: 5px;">Excel format with headers and structure only</div>
                             </label>
                         </div>
                     </div>
@@ -386,7 +404,7 @@
                             <label for="pdfFile" class="file-input-label">
                                 <div style="font-size: 2rem; margin-bottom: 10px;">📋</div>
                                 <div><strong>Upload CTR and Shift Ticket PDFs</strong></div>
-                                <div style="color: #a0aec0; margin-top: 5px;">Or drag and drop here</div>
+                                <div style="color: #a0aec0; margin-top: 5px;">Blank fillable PDF forms</div>
                             </label>
                         </div>
                         <button onclick="clearAllForms()" class="btn-danger" style="height: fit-content; width: auto; padding: 15px 20px;">
@@ -397,8 +415,8 @@
                     <div id="pdfFormsPreview"></div>
                     
                     <div style="margin-top: 20px;">
-                        <button onclick="saveProject()" class="btn-success">
-                            Save Project
+                        <button onclick="saveTemplate()" class="btn-success">
+                            Save Template
                         </button>
                     </div>
                 </div>
@@ -406,23 +424,59 @@
             
             <!-- User Mode -->
             <div id="userMode" class="mode-section">
-                <!-- Project Selection -->
+                <!-- Active Projects -->
                 <div class="step">
                     <div class="step-title">
-                        <div class="step-number">🎯</div>
-                        Select Project
+                        <div class="step-number">📂</div>
+                        My Active Projects
                     </div>
                     
-                    <div id="userProjectList" class="project-list">
-                        <!-- Available projects will be shown here -->
+                    <div style="margin-bottom: 20px;">
+                        <button onclick="showNewProjectDialog()" class="btn-success" style="width: auto; padding: 12px 24px;">
+                            + Start New Project
+                        </button>
+                    </div>
+                    
+                    <div id="activeProjectsList" class="project-list">
+                        <!-- Active projects will be shown here -->
                     </div>
                 </div>
                 
-                <!-- Simple User Workflow -->
-                <div class="step" id="userWorkflow" style="display: none;">
+                <!-- New Project Dialog -->
+                <div class="step" id="newProjectDialog" style="display: none;">
+                    <div class="step-title">
+                        <div class="step-number">🆕</div>
+                        Start New Project
+                    </div>
+                    
+                    <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 20px; margin-bottom: 20px;">
+                        <div>
+                            <label style="display: block; font-weight: 600; margin-bottom: 8px;">Project Name:</label>
+                            <input type="text" id="newProjectName" placeholder="e.g., Canyon Fire 2024">
+                        </div>
+                        <div>
+                            <label style="display: block; font-weight: 600; margin-bottom: 8px;">Select Template:</label>
+                            <select id="templateSelect">
+                                <option value="">Choose a template...</option>
+                            </select>
+                        </div>
+                    </div>
+                    
+                    <button onclick="createUserProject()" class="btn-success">
+                        Create Project & Open Spreadsheet
+                    </button>
+                </div>
+                
+                <!-- PDF Generation -->
+                <div class="step" id="pdfGenerationStep" style="display: none;">
                     <div class="step-title">
                         <div class="step-number">📝</div>
-                        Generate PDFs
+                        Generate PDFs for: <span id="activeProjectName"></span>
+                    </div>
+                    
+                    <div style="margin-bottom: 20px; padding: 15px; background: #e8f5e8; border-radius: 8px;">
+                        <p><strong>Spreadsheet:</strong> <a id="spreadsheetLink" href="#" target="_blank" style="color: #5a6c57;">Open in Google Sheets</a></p>
+                        <p style="margin-top: 10px;"><strong>Last Updated:</strong> <span id="lastUpdated">Checking...</span></p>
                     </div>
                     
                     <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 20px; margin-bottom: 20px;">
@@ -436,8 +490,12 @@
                         </div>
                     </div>
                     
+                    <button onclick="loadSpreadsheetData()" class="btn-info" style="margin-bottom: 20px;">
+                        🔄 Load Current Spreadsheet Data
+                    </button>
+                    
                     <div id="daySelector" style="margin: 20px 0;">
-                        <!-- Day selection will appear here -->
+                        <!-- Day selection will appear here after loading data -->
                     </div>
                     
                     <div id="selectedDayPreview" style="display: none;">
@@ -456,7 +514,9 @@
 
     <script>
         // Global variables
-        var projects = [];
+        var templates = [];
+        var userProjects = [];
+        var currentTemplate = null;
         var currentProject = null;
         var timesheetData = null;
         var pdfTemplates = [];
@@ -464,22 +524,74 @@
         var isAuthenticated = false;
         var accessToken = null;
         var tokenClient;
+        var gapiInited = false;
         var currentMode = 'admin';
         
         // Google API configuration
         const CLIENT_ID = '366876817577-1va8eaifrnvu76dl15chgvcqlvcc6af0.apps.googleusercontent.com';
+        const API_KEY = 'YOUR_API_KEY_HERE'; // You'll need to add an API key
+        const DISCOVERY_DOCS = [
+            'https://sheets.googleapis.com/$discovery/rest?version=v4',
+            'https://www.googleapis.com/discovery/v1/apis/drive/v3/rest'
+        ];
         const SCOPES = 'https://www.googleapis.com/auth/spreadsheets https://www.googleapis.com/auth/drive.file';
         
-        // Essential functions
+        // Initialize Google API
+        function handleClientLoad() {
+            gapi.load('client:auth2', initClient);
+        }
+        
+        function initClient() {
+            gapi.client.init({
+                apiKey: API_KEY,
+                clientId: CLIENT_ID,
+                discoveryDocs: DISCOVERY_DOCS,
+                scope: SCOPES
+            }).then(function() {
+                gapiInited = true;
+                gapi.auth2.getAuthInstance().isSignedIn.listen(updateSigninStatus);
+                updateSigninStatus(gapi.auth2.getAuthInstance().isSignedIn.get());
+            }, function(error) {
+                console.error('Error initializing Google API:', error);
+                showAuthStatus('Error initializing Google APIs. Check console for details.', 'error');
+            });
+        }
+        
+        function updateSigninStatus(isSignedIn) {
+            if (isSignedIn) {
+                isAuthenticated = true;
+                document.getElementById('authorizeBtn').innerHTML = '✅ Connected to Google';
+                document.getElementById('authorizeBtn').disabled = true;
+                showAuthStatus('Successfully connected to Google!', 'success');
+                loadTemplates();
+                loadUserProjects();
+            } else {
+                isAuthenticated = false;
+                document.getElementById('authorizeBtn').innerHTML = '🔗 Connect Google Account';
+                document.getElementById('authorizeBtn').disabled = false;
+                showAuthStatus('Click to connect your Google account', 'info');
+            }
+        }
+        
+        function handleAuthClick() {
+            if (gapiInited) {
+                gapi.auth2.getAuthInstance().signIn();
+            } else {
+                alert('Google APIs are still loading. Please try again in a moment.');
+            }
+        }
+        
+        function handleSignoutClick() {
+            gapi.auth2.getAuthInstance().signOut();
+        }
+        
+        // Mode switching
         function switchMode(mode, button) {
-            console.log('switchMode called:', mode);
             currentMode = mode;
             
-            // Update mode buttons
             document.querySelectorAll('.mode-btn').forEach(btn => btn.classList.remove('active'));
             if (button) button.classList.add('active');
             
-            // Show/hide mode sections
             document.querySelectorAll('.mode-section').forEach(section => section.classList.remove('active'));
             document.getElementById(mode + 'Mode').classList.add('active');
             
@@ -488,278 +600,78 @@
             }
         }
         
-        function handleAuthClick() {
-            console.log('handleAuthClick called');
-            if (!isAuthenticated && tokenClient) {
-                showAuthStatus('Requesting Google Drive access...', 'info');
-                tokenClient.requestAccessToken();
-            } else {
-                console.log('Not ready for auth:', { isAuthenticated, tokenClient });
-            }
-        }
-        
-        function showAuthStatus(message, type) {
-            const authStatusEl = document.getElementById('authStatus');
-            if (authStatusEl) {
-                authStatusEl.innerHTML = '<div class="status ' + type + '" style="margin: 0;">' + message + '</div>';
-            }
-        }
-        
-        function showStatus(message, type) {
-            const statusDivs = ['userStatusMessage'];
-            statusDivs.forEach(function(id) {
-                const div = document.getElementById(id);
-                if (div) {
-                    div.innerHTML = '<div class="status ' + type + '">' + message + '</div>';
-                }
-            });
-        }
-        
-        // Initialize Google API
-        function initializeGoogleAPI() {
-            console.log('Initializing Google API...');
-            showAuthStatus('Loading Google APIs...', 'info');
-            
-            var attempts = 0;
-            var maxAttempts = 50;
-            
-            function checkGoogle() {
-                attempts++;
-                if (typeof google !== 'undefined' && google.accounts) {
-                    console.log('Google APIs loaded');
-                    try {
-                        tokenClient = google.accounts.oauth2.initTokenClient({
-                            client_id: CLIENT_ID,
-                            scope: SCOPES,
-                            callback: function(tokenResponse) {
-                                console.log('OAuth successful');
-                                isAuthenticated = true;
-                                accessToken = tokenResponse.access_token;
-                                
-                                document.getElementById('authorizeBtn').innerHTML = 'Connected to Google Drive';
-                                document.getElementById('authorizeBtn').disabled = true;
-                                showAuthStatus('Successfully connected to Google Drive!', 'success');
-                            }
-                        });
-                        
-                        showAuthStatus('Ready to connect. Click the button to authorize Google Drive access.', 'info');
-                    } catch (error) {
-                        console.error('Error creating token client:', error);
-                        showAuthStatus('Google Drive integration unavailable. Save as HTML to use.', 'info');
-                    }
-                } else if (attempts < maxAttempts) {
-                    setTimeout(checkGoogle, 100);
-                } else {
-                    console.log('Google APIs not available');
-                    showAuthStatus('Google Drive integration unavailable. Save as HTML to use.', 'info');
-                }
-            }
-            
-            checkGoogle();
-        }
-        
-        // Load projects from localStorage
-        function loadProjects() {
-            const savedProjects = localStorage.getItem('kdtProjects');
-            projects = savedProjects ? JSON.parse(savedProjects) : [];
-            renderProjectList();
-        }
-        
-        // Render project list
-        function renderProjectList() {
-            const container = document.getElementById('projectList');
-            
-            if (projects.length === 0) {
-                container.innerHTML = '<p style="color: #718096; text-align: center; padding: 40px;">No projects yet. Create your first project!</p>';
-                return;
-            }
-            
-            var html = '';
-            projects.forEach(function(project, index) {
-                html += '<div class="project-card" onclick="loadProject(' + index + ')">' +
-                    '<h4>' + project.name + '</h4>' +
-                    '<p style="color: #718096; margin: 10px 0;">Created: ' + new Date(project.created).toLocaleDateString() + '</p>' +
-                    '<p style="color: #718096;">Base Folder: ' + (project.baseFolder || 'Not set') + '</p>' +
-                    '<div style="margin-top: 15px;">' +
-                    '<button onclick="event.stopPropagation(); deleteProject(' + index + ')" class="btn-danger" style="width: auto; padding: 8px 15px; font-size: 0.9rem;">Delete</button>' +
-                    '</div></div>';
-            });
-            
-            container.innerHTML = html;
-        }
-        
-        // Create new project
-        function createNewProject() {
-            currentProject = {
+        // Template Management (Admin)
+        function createNewTemplate() {
+            currentTemplate = {
                 name: '',
                 created: new Date().toISOString(),
-                baseFolder: '',
-                timesheetData: null,
+                timesheetTemplate: null,
                 pdfTemplates: []
             };
             
-            document.getElementById('projectSetupStep').style.display = 'block';
-            document.getElementById('currentProjectName').textContent = 'New Project';
-            document.getElementById('projectNameInput').value = '';
-            document.getElementById('baseFolderInput').value = '';
+            document.getElementById('templateSetupStep').style.display = 'block';
+            document.getElementById('currentTemplateName').textContent = 'New Template';
+            document.getElementById('templateNameInput').value = '';
         }
         
-        // Load existing project
-        function loadProject(index) {
-            currentProject = projects[index];
-            document.getElementById('projectSetupStep').style.display = 'block';
-            document.getElementById('currentProjectName').textContent = currentProject.name;
-            document.getElementById('projectNameInput').value = currentProject.name;
-            document.getElementById('baseFolderInput').value = currentProject.baseFolder || '';
-            
-            if (currentProject.timesheetData) {
-                timesheetData = currentProject.timesheetData;
-                displayTimesheetPreview();
-                document.getElementById('pdfTemplateStep').style.display = 'block';
-            }
-            
-            if (currentProject.pdfTemplateData) {
-                pdfTemplates = currentProject.pdfTemplateData.map(function(templateData) {
-                    return {
-                        name: templateData.name,
-                        type: templateData.type,
-                        file: base64ToFile(templateData.data, templateData.name)
-                    };
-                });
-                displayPDFPreview();
-            }
-        }
-        
-        // Delete project
-        function deleteProject(index) {
-            if (confirm('Are you sure you want to delete this project?')) {
-                projects.splice(index, 1);
-                localStorage.setItem('kdtProjects', JSON.stringify(projects));
-                renderProjectList();
-            }
-        }
-        
-        // Handle timesheet upload
-        function handleTimesheetUpload(event) {
-            const file = event.target.files[0];
+        function handleTimesheetTemplateUpload(event) {
+            var file = event.target.files[0];
             if (!file) return;
             
-            showStatus('Processing timesheet...', 'info');
+            showStatus('Processing template...', 'info');
             
-            const reader = new FileReader();
+            var reader = new FileReader();
             reader.onload = function(e) {
-                try {
-                    const workbook = XLSX.read(e.target.result, { type: 'array', cellDates: true });
-                    const worksheet = workbook.Sheets[workbook.SheetNames[0]];
-                    const jsonData = XLSX.utils.sheet_to_json(worksheet, { header: 1 });
-                    
-                    timesheetData = processTimesheetData(jsonData);
-                    currentProject.timesheetData = timesheetData;
-                    
-                    displayTimesheetPreview();
-                    document.getElementById('pdfTemplateStep').style.display = 'block';
-                    
-                    showStatus('Timesheet processed successfully!', 'success');
-                } catch (error) {
-                    console.error('Error processing timesheet:', error);
-                    showStatus('Error processing timesheet: ' + error.message, 'error');
-                }
+                currentTemplate.timesheetTemplate = {
+                    name: file.name,
+                    data: e.target.result
+                };
+                
+                document.getElementById('timesheetPreview').innerHTML = 
+                    '<div style="background: #e8f5e8; padding: 15px; border-radius: 8px;">' +
+                    '<strong>Template uploaded:</strong> ' + file.name +
+                    '</div>';
+                
+                document.getElementById('pdfTemplateStep').style.display = 'block';
+                showStatus('Template uploaded successfully!', 'success');
             };
             reader.readAsArrayBuffer(file);
         }
         
-        // Process timesheet data - YOUR ORIGINAL FUNCTION CONTINUES FROM HERE
-        function processTimesheetData(jsonData) {
-            const fireName = jsonData[0] && jsonData[0][1] ? jsonData[0][1] : 'Unknown Fire';
-            const dateRow = jsonData[3];
-            const dates = [];
-            
-            for (var i = 4; i < dateRow.length; i += 2) {
-                if (dateRow[i] && dateRow[i + 1]) {
-                    dates.push({
-                        dayName: dateRow[i],
-                        date: dateRow[i + 1],
-                        workedCol: i,
-                        milesCol: i + 1
-                    });
-                }
-            }
-            
-            const employees = [];
-            for (var i = 5; i < jsonData.length; i++) {
-                const row = jsonData[i];
-                if (!row || !row[0] || typeof row[0] !== 'string') continue;
-                
-                const name = row[0].trim();
-                if (!name || 
-                    name.toLowerCase().includes('total') || 
-                    name.toLowerCase().includes('combined') ||
-                    name === 'GUARDS' || name === 'MANAGER' || name === 'SUPERVISORS' ||
-                    name.toLowerCase().includes('charge') ||
-                    name.toLowerCase().includes('daily') ||
-                    name === '') {
-                    continue;
-                }
-                
-                var classification = 'Guard';
-                for (var j = i - 1; j >= 0; j--) {
-                    const prevRow = jsonData[j];
-                    if (prevRow && prevRow[0]) {
-                        const prevName = String(prevRow[0]).toLowerCase();
-                        if (prevName.includes('manager')) {
-                            classification = 'Manager';
-                            break;
-                        } else if (prevName.includes('supervisor')) {
-                            classification = 'Supervisor';
-                            break;
-                        } else if (prevName.includes('guard')) {
-                            classification = 'Guard';
-                            break;
-                        }
-                    }
-                }
-                
-                var hasData = false;
-                for (var col = 4; col < row.length; col += 2) {
-                    if (row[col] && row[col] > 0) {
-                        hasData = true;
-                        break;
-                    }
-                }
-                
-                if (hasData) {
-                    employees.push({
-                        name: name,
-                        classification: classification,
-                        rowData: row
-                    });
-                }
-            }
-            
-            return {
-                fireName: fireName,
-                dates: dates,
-                employees: employees,
-                rawData: jsonData
-            };
-        }
-        
-        // REST OF YOUR ORIGINAL FUNCTIONS CONTINUE HERE...
-        // I'll include just the stubs to keep it working
-        
-        function displayTimesheetPreview() {
-            // Your original implementation
-            console.log('Displaying timesheet preview');
-        }
-        
         function handlePDFUpload(event) {
-            // Your original implementation
-            console.log('PDF upload');
+            var files = Array.from(event.target.files);
+            if (!files.length) return;
+            
+            pdfTemplates = [];
+            files.forEach(function(file) {
+                pdfTemplates.push({
+                    name: file.name,
+                    file: file,
+                    type: file.name.toLowerCase().includes('ctr') ? 'ctr' : 
+                          file.name.toLowerCase().includes('shift') ? 'shift' : 'unknown'
+                });
+            });
+            
+            displayPDFPreview();
         }
         
         function displayPDFPreview() {
-            // Your original implementation
-            console.log('Displaying PDF preview');
+            var preview = document.getElementById('pdfFormsPreview');
+            if (pdfTemplates.length === 0) {
+                preview.innerHTML = '';
+                return;
+            }
+            
+            var html = '<div style="background: #f8f9fa; padding: 20px; border-radius: 8px;"><h4>PDF Templates</h4>';
+            pdfTemplates.forEach(function(template) {
+                html += '<div style="display: flex; justify-content: space-between; align-items: center; padding: 10px; background: white; border-radius: 6px; margin-bottom: 10px;">' +
+                    '<div><strong>' + template.name + '</strong>' +
+                    '<div style="color: #718096; font-size: 0.9rem;">Type: ' + template.type.toUpperCase() + '</div>' +
+                    '</div></div>';
+            });
+            html += '</div>';
+            
+            preview.innerHTML = html;
         }
         
         function clearAllForms() {
@@ -768,92 +680,90 @@
             displayPDFPreview();
         }
         
-        function base64ToFile(base64, filename) {
-            const byteCharacters = atob(base64);
-            const byteNumbers = new Array(byteCharacters.length);
-            for (var i = 0; i < byteCharacters.length; i++) {
-                byteNumbers[i] = byteCharacters.charCodeAt(i);
-            }
-            const byteArray = new Uint8Array(byteNumbers);
-            return new File([byteArray], filename, { type: 'application/pdf' });
-        }
-        
-        function saveProject() {
-            console.log('Save project');
-            alert('Save project - implement full function');
-        }
-        
-        function loadUserProjects() {
-            console.log('Load user projects');
-        }
-        
-        function selectUserProject(index) {
-            console.log('Select user project');
-        }
-        
-        function selectDay(index) {
-            selectedDay = timesheetData.dates[index];
+        function saveTemplate() {
+            var templateName = document.getElementById('templateNameInput').value.trim();
             
-            // Update visual selection
-            var cards = document.querySelectorAll('[id^="dayCard"]');
-            for (var i = 0; i < cards.length; i++) {
-                cards[i].style.borderColor = '#dee2e6';
-                cards[i].style.background = 'white';
+            if (!templateName) {
+                alert('Please enter a template name.');
+                return;
             }
             
-            var selectedCard = document.getElementById('dayCard' + index);
-            selectedCard.style.borderColor = '#28a745';
-            selectedCard.style.background = '#e8f5e8';
+            if (!currentTemplate.timesheetTemplate) {
+                alert('Please upload a timesheet template.');
+                return;
+            }
             
-            displaySelectedDayPreview();
-            document.getElementById('selectedDayPreview').style.display = 'block';
-        }
-        
-        function displaySelectedDayPreview() {
-            console.log('Display selected day preview');
-        }
-        
-        function calculateDaySummary(dateInfo) {
-            var totalPeople = 0;
-            var totalMiles = 0;
+            if (pdfTemplates.length === 0) {
+                alert('Please upload PDF templates.');
+                return;
+            }
             
-            timesheetData.employees.forEach(function(emp) {
-                const worked = emp.rowData[dateInfo.workedCol];
-                const miles = emp.rowData[dateInfo.milesCol] || 0;
-                
-                if (worked >= 8 && worked <= 16) {
-                    totalPeople++;
-                }
-                totalMiles += miles;
+            // Convert PDFs to base64 for storage
+            var promises = pdfTemplates.map(function(template) {
+                return new Promise(function(resolve) {
+                    var reader = new FileReader();
+                    reader.onload = function(e) {
+                        resolve({
+                            name: template.name,
+                            type: template.type,
+                            data: btoa(String.fromCharCode.apply(null, new Uint8Array(e.target.result)))
+                        });
+                    };
+                    reader.readAsArrayBuffer(template.file);
+                });
             });
             
-            return { totalPeople: totalPeople, totalMiles: totalMiles };
+            Promise.all(promises).then(function(pdfData) {
+                currentTemplate.name = templateName;
+                currentTemplate.pdfTemplateData = pdfData;
+                
+                // Save to localStorage
+                templates.push(currentTemplate);
+                localStorage.setItem('kdtTemplates', JSON.stringify(templates));
+                
+                loadTemplates();
+                alert('Template saved successfully!');
+                
+                // Reset form
+                document.getElementById('templateSetupStep').style.display = 'none';
+                document.getElementById('pdfTemplateStep').style.display = 'none';
+            });
         }
         
-        function generatePDFs() {
-            console.log('Generate PDFs');
-            alert('PDF generation - implement full function');
+        function loadTemplates() {
+            var saved = localStorage.getItem('kdtTemplates');
+            templates = saved ? JSON.parse(saved) : [];
+            
+            var container = document.getElementById('templateList');
+            if (templates.length === 0) {
+                container.innerHTML = '<p style="color: #718096; text-align: center; padding: 40px;">No templates yet. Create your first template!</p>';
+                return;
+            }
+            
+            var html = '';
+            templates.forEach(function(template, index) {
+                html += '<div class="project-card">' +
+                    '<h4>' + template.name + '</h4>' +
+                    '<p style="color: #718096;">Created: ' + new Date(template.created).toLocaleDateString() + '</p>' +
+                    '<button onclick="deleteTemplate(' + index + ')" class="btn-danger" style="width: auto; padding: 8px 15px; font-size: 0.9rem; margin-top: 10px;">Delete</button>' +
+                    '</div>';
+            });
+            
+            container.innerHTML = html;
         }
         
-        function downloadPDF(pdfBytes, filename) {
-            const blob = new Blob([pdfBytes], { type: 'application/pdf' });
-            const url = URL.createObjectURL(blob);
-            const a = document.createElement('a');
-            a.href = url;
-            a.download = filename;
-            document.body.appendChild(a);
-            a.click();
-            document.body.removeChild(a);
-            URL.revokeObjectURL(url);
+        function deleteTemplate(index) {
+            if (confirm('Delete this template?')) {
+                templates.splice(index, 1);
+                localStorage.setItem('kdtTemplates', JSON.stringify(templates));
+                loadTemplates();
+            }
         }
         
-        // Initialize app when page loads
-        window.addEventListener('load', function() {
-            console.log('Page loaded, initializing...');
-            initializeGoogleAPI();
-            loadProjects();
-            showStatus('KDT Auto-Generator ready! Connect to Google Drive to start.', 'info');
-        });
-    </script>
-</body>
-</html>
+        // User Mode Functions
+        function loadUserProjects() {
+            var saved = localStorage.getItem('kdtUserProjects');
+            userProjects = saved ? JSON.parse(saved) : [];
+            
+            var container = document.getElementById('activeProjectsList');
+            if (userPro
