@@ -3,10 +3,10 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>KDT Daily CTR/Shift Ticket Converter</title>
+    <title>KDT Daily CTR/Shift Ticket Auto-Generator</title>
     <script src="https://accounts.google.com/gsi/client"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf-lib/1.17.1/pdf-lib.min.js"></script>
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/papaparse/5.4.1/papaparse.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
     <style>
         * {
             margin: 0;
@@ -23,7 +23,7 @@
         }
         
         .container {
-            max-width: 1400px;
+            max-width: 1600px;
             margin: 0 auto;
             background: rgba(248, 249, 250, 0.98);
             backdrop-filter: blur(10px);
@@ -59,10 +59,31 @@
             color: #f0f0f0;
         }
         
-        .header p {
-            opacity: 0.9;
-            font-size: 1.1rem;
-            color: #e0e0e0;
+        .mode-selector {
+            background: rgba(255, 255, 255, 0.1);
+            padding: 20px;
+            margin: 20px 0;
+            border-radius: 12px;
+            display: flex;
+            gap: 15px;
+            justify-content: center;
+        }
+        
+        .mode-btn {
+            padding: 15px 30px;
+            background: rgba(255, 255, 255, 0.2);
+            color: white;
+            border: 2px solid rgba(255, 255, 255, 0.3);
+            border-radius: 8px;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            font-weight: 600;
+        }
+        
+        .mode-btn.active {
+            background: rgba(255, 255, 255, 0.9);
+            color: #2d4a3e;
+            border-color: white;
         }
         
         .content {
@@ -111,6 +132,176 @@
             box-shadow: 0 2px 4px rgba(0, 0, 0, 0.2);
         }
         
+        /* Project Management */
+        .project-panel {
+            background: #f8f9fa;
+            border: 2px solid #5a6c57;
+            border-radius: 12px;
+            padding: 20px;
+            margin: 20px 0;
+        }
+        
+        .project-list {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+            gap: 15px;
+        }
+        
+        .project-card {
+            background: white;
+            border: 2px solid #dee2e6;
+            border-radius: 8px;
+            padding: 20px;
+            cursor: pointer;
+            transition: all 0.3s ease;
+        }
+        
+        .project-card:hover {
+            border-color: #5a6c57;
+            transform: translateY(-2px);
+            box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
+        }
+        
+        /* Day Selection Grid */
+        .day-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+            gap: 15px;
+            margin: 20px 0;
+        }
+        
+        .day-card {
+            background: white;
+            border: 2px solid #dee2e6;
+            border-radius: 8px;
+            padding: 15px;
+            cursor: pointer;
+            transition: all 0.3s ease;
+        }
+        
+        .day-card:hover {
+            border-color: #5a6c57;
+            transform: translateY(-2px);
+        }
+        
+        .day-card.selected {
+            border-color: #28a745;
+            background: #e8f5e8;
+        }
+        
+        .day-header {
+            font-weight: 600;
+            color: #2d4a3e;
+            margin-bottom: 10px;
+        }
+        
+        .day-summary {
+            color: #718096;
+            font-size: 0.9rem;
+        }
+        
+        /* Employee Preview */
+        .employee-preview {
+            background: #f8f9fa;
+            border-radius: 8px;
+            padding: 15px;
+            margin: 15px 0;
+            max-height: 300px;
+            overflow-y: auto;
+        }
+        
+        .employee-row {
+            display: grid;
+            grid-template-columns: 2fr 1fr 1fr 1fr;
+            gap: 10px;
+            padding: 8px;
+            background: white;
+            margin-bottom: 5px;
+            border-radius: 4px;
+            font-size: 0.9rem;
+        }
+        
+        .employee-row.header {
+            background: #5a6c57;
+            color: white;
+            font-weight: 600;
+        }
+        
+        /* Form Controls */
+        input, select, button, textarea {
+            width: 100%;
+            padding: 15px;
+            border: 2px solid #dee2e6;
+            border-radius: 8px;
+            font-size: 1rem;
+            transition: all 0.3s ease;
+            background: white;
+        }
+        
+        input:focus, select:focus, button:focus, textarea:focus {
+            outline: none;
+            border-color: #5a6c57;
+            box-shadow: 0 0 0 3px rgba(90, 108, 87, 0.1);
+        }
+        
+        button {
+            background: linear-gradient(135deg, #5a6c57, #4a5d4a);
+            color: white;
+            border: none;
+            cursor: pointer;
+            font-weight: 600;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+        }
+        
+        button:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 6px 12px rgba(90, 108, 87, 0.3);
+            background: linear-gradient(135deg, #6c7f6c, #5a6c57);
+        }
+        
+        button:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+            transform: none;
+            background: #6c757d;
+        }
+        
+        .btn-success {
+            background: linear-gradient(135deg, #28a745, #20c997);
+        }
+        
+        .btn-danger {
+            background: #dc3545;
+        }
+        
+        /* Status Messages */
+        .status {
+            padding: 15px;
+            border-radius: 12px;
+            margin-top: 20px;
+            font-weight: 600;
+        }
+        
+        .status.success {
+            background: #d4edda;
+            color: #155724;
+            border: 2px solid #c3e6cb;
+        }
+        
+        .status.error {
+            background: #f8d7da;
+            color: #721c24;
+            border: 2px solid #f5c6cb;
+        }
+        
+        .status.info {
+            background: #e2f1e8;
+            color: #2d4a3e;
+            border: 2px solid #5a6c57;
+        }
+        
+        /* File Upload */
         .file-input {
             position: relative;
             display: inline-block;
@@ -144,227 +335,27 @@
             color: #2d4a3e;
         }
         
-        input, select, button, textarea {
-            width: 100%;
-            padding: 15px;
-            border: 2px solid #dee2e6;
-            border-radius: 8px;
-            font-size: 1rem;
-            transition: all 0.3s ease;
-            background: white;
+        /* Hidden sections */
+        .mode-section {
+            display: none;
         }
         
-        input:focus, select:focus, button:focus, textarea:focus {
-            outline: none;
-            border-color: #5a6c57;
-            box-shadow: 0 0 0 3px rgba(90, 108, 87, 0.1);
+        .mode-section.active {
+            display: block;
         }
         
-        button {
-            background: linear-gradient(135deg, #5a6c57, #4a5d4a);
-            color: white;
-            border: none;
-            cursor: pointer;
-            font-weight: 600;
-            text-transform: uppercase;
-            letter-spacing: 1px;
-            border: 2px solid #3d503d;
-        }
-        
-        button:hover {
-            transform: translateY(-2px);
-            box-shadow: 0 6px 12px rgba(90, 108, 87, 0.3);
-            background: linear-gradient(135deg, #6c7f6c, #5a6c57);
-        }
-        
-        button:disabled {
-            opacity: 0.5;
-            cursor: not-allowed;
-            transform: none;
-            background: #6c757d;
-            border-color: #6c757d;
-        }
-        
-        .preview {
-            background: white;
-            padding: 20px;
-            border-radius: 12px;
-            border: 2px solid #dee2e6;
-            margin-top: 20px;
-        }
-        
-        .preview h4 {
-            color: #2d4a3e;
-            margin-bottom: 15px;
-            font-size: 1.1rem;
-        }
-        
-        .data-row {
-            display: grid;
-            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
-            gap: 15px;
-            padding: 15px;
-            background: #f8f9fa;
-            border-radius: 8px;
-            margin-bottom: 10px;
-            border: 1px solid #e9ecef;
-        }
-        
-        .data-item {
-            display: flex;
-            flex-direction: column;
-        }
-        
-        .data-label {
-            font-weight: 600;
-            color: #5a6c57;
-            font-size: 0.9rem;
-            margin-bottom: 5px;
-        }
-        
-        .data-value {
-            color: #2d4a3e;
-            background: white;
-            padding: 8px 12px;
-            border-radius: 6px;
-            border: 1px solid #dee2e6;
-        }
-        
-        .mapping-row {
-            display: grid;
-            grid-template-columns: 2fr 4fr 1fr auto;
-            gap: 15px;
-            padding: 15px;
-            background: white;
-            border: 1px solid #dee2e6;
-            align-items: center;
-        }
-        
-        .mapping-row:nth-child(even) {
-            background: #f8f9fa;
-        }
-        
-        .mapping-row input, .mapping-row textarea {
-            padding: 8px 12px;
-            font-size: 0.9rem;
-        }
-        
-        .mapping-row textarea {
-            resize: vertical;
-            min-height: 35px;
-            font-family: 'Monaco', 'Menlo', 'Ubuntu Mono', monospace;
-        }
-        
-        .formula-preview {
-            background: #e8f3e8;
-            padding: 6px 10px;
-            border-radius: 4px;
-            border: 1px solid #5a6c57;
-            font-size: 0.85rem;
-            color: #2d4a3e;
-            min-height: 30px;
-            display: flex;
-            align-items: center;
-        }
-        
-        .delete-mapping {
-            background: #dc3545;
-            color: white;
-            border: none;
-            padding: 8px 12px;
-            border-radius: 6px;
-            cursor: pointer;
-            font-size: 0.85rem;
-            width: auto;
-        }
-        
-        .delete-mapping:hover {
-            background: #c82333;
-        }
-        
-        .status {
-            padding: 15px;
-            border-radius: 12px;
-            margin-top: 20px;
-            font-weight: 600;
-        }
-        
-        .status.success {
-            background: #d4edda;
-            color: #155724;
-            border: 2px solid #c3e6cb;
-        }
-        
-        .status.error {
-            background: #f8d7da;
-            color: #721c24;
-            border: 2px solid #f5c6cb;
-        }
-        
-        .status.info {
-            background: #e2f1e8;
-            color: #2d4a3e;
-            border: 2px solid #5a6c57;
-        }
-        
-        .field-button {
-            margin: 5px;
-            padding: 8px 12px;
-            background: #e9ecef;
-            color: #2d4a3e;
-            border: 1px solid #dee2e6;
-            border-radius: 6px;
-            cursor: pointer;
-            font-size: 0.9rem;
-            width: auto;
-            display: inline-block;
-        }
-        
-        .field-button:hover {
-            background: #5a6c57;
-            color: white;
-            transform: none;
-        }
-        
-        .quick-formula-grid {
-            display: grid;
-            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
-            gap: 10px;
-            margin-top: 10px;
-        }
-        
-        .mapping-header {
-            display: grid;
-            grid-template-columns: 2fr 4fr 1fr auto;
-            gap: 15px;
-            padding: 15px;
-            background: linear-gradient(135deg, #5a6c57, #4a5d4a) !important;
-            color: white !important;
-            border-radius: 8px 8px 0 0;
-            font-weight: 600;
-        }
-
+        /* Responsive */
         @media (max-width: 768px) {
             .content {
                 padding: 20px;
             }
             
-            .step {
-                padding: 20px;
+            .mode-selector {
+                flex-direction: column;
             }
             
-            .header h1 {
-                font-size: 2rem;
-            }
-            
-            .mapping-row {
+            .day-grid {
                 grid-template-columns: 1fr;
-                gap: 10px;
-            }
-            
-            .kdt-logo {
-                width: 60px;
-                height: 60px;
             }
         }
     </style>
@@ -373,15 +364,20 @@
     <div class="container">
         <div class="header">
             <div class="kdt-logo"></div>
-            <h1>🎯 KDT Daily CTR/Shift Ticket Converter</h1>
-            <p>Convert timesheet data to CTR and Shift Ticket forms with collaborative project management</p>
+            <h1>KDT Daily CTR/Shift Ticket Auto-Generator</h1>
+            <p>Automated PDF generation with project management and team collaboration</p>
+            
+            <div class="mode-selector">
+                <button class="mode-btn active" onclick="switchMode('admin')">Admin Mode</button>
+                <button class="mode-btn" onclick="switchMode('user')">User Mode</button>
+            </div>
         </div>
         
         <div class="content">
             <!-- Google Drive Authentication -->
             <div class="step">
                 <div class="step-title">
-                    <div class="step-number">🔐</div>
+                    <div class="step-number">🔑</div>
                     Google Drive Authentication
                 </div>
                 <p style="margin-bottom: 20px; color: #718096;">Connect to Google Drive to access sheets and manage project files.</p>
@@ -396,272 +392,224 @@
                 </div>
             </div>
             
-            <!-- Step 1: Google Sheet Integration -->
-            <div class="step">
-                <div class="step-title">
-                    <div class="step-number">1</div>
-                    Google Sheets Data
-                </div>
-                <p style="margin-bottom: 20px; color: #718096;">Link your Google Sheets timesheet.</p>
-                
-                <div style="display: grid; grid-template-columns: 3fr auto; gap: 15px; margin-bottom: 20px;">
-                    <div>
-                        <label style="display: block; font-weight: 600; margin-bottom: 8px;">Google Sheets URL:</label>
-                        <input type="text" id="sheetUrl" placeholder="Paste Google Sheets sharing URL here">
-                    </div>
-                    <button onclick="loadGoogleSheet()" style="height: fit-content; width: auto;">📊 Load Sheet</button>
-                </div>
-                
-                <div id="sheetPreview"></div>
-            </div>
-            
-            <!-- Step 2: Select Day -->
-            <div class="step">
-                <div class="step-title">
-                    <div class="step-number">2</div>
-                    Select Day to Fill
-                </div>
-                <p style="margin-bottom: 20px; color: #718096;">Choose which day's data you want to use for filling the PDF forms.</p>
-                <select id="daySelect" disabled>
-                    <option value="">Load sheet first to see available days</option>
-                </select>
-                <div id="selectedDataPreview"></div>
-            </div>
-            
-            <!-- Step 2.5: Data Mapping & Formulas -->
-            <div class="step" id="mappingStep" style="display: none;">
-                <div class="step-title">
-                    <div class="step-number">2.5</div>
-                    Data Mapping & Formulas
-                </div>
-                <p style="margin-bottom: 20px; color: #718096;">Specify which data to transfer and how to calculate it. Use Google Sheets-style formulas.</p>
-                
-                <div style="display: grid; grid-template-columns: 2fr auto auto; gap: 15px; margin-bottom: 20px;">
-                    <div>
-                        <label style="display: block; font-weight: 600; margin-bottom: 10px;">Mapping Template:</label>
-                        <select id="templateSelect" onchange="loadMappingTemplate()">
-                            <option value="custom">Custom Mapping</option>
-                            <option value="ctr_daily">KDT Daily CTR Template</option>
-                            <option value="shift_ticket">Shift Ticket Template</option>
-                            <option value="timesheet">Generic Timesheet</option>
-                        </select>
-                    </div>
-                    <button type="button" onclick="addMappingRow()" style="width: auto; height: fit-content; margin-top: 30px;">
-                        ➕ Add Field
-                    </button>
-                    <button onclick="applyMappings()" style="background: linear-gradient(135deg, #28a745, #20c997); width: auto; height: fit-content; margin-top: 30px;">
-                        🔄 Apply Mappings
-                    </button>
-                </div>
-                
-                <div id="mappingContainer">
-                    <div class="mapping-header">
-                        <div>PDF Field Name</div>
-                        <div>Formula / Data Source</div>
-                        <div>Preview</div>
-                        <div>Actions</div>
-                    </div>
-                    <div id="mappingRows"></div>
-                </div>
-                
-                <!-- Interactive Field Selector -->
-                <div style="margin-top: 20px; padding: 20px; background: #f8f9fa; border-radius: 12px; border: 2px solid #e2e8f0;">
-                    <h4 style="color: #2d4a3e; margin-bottom: 15px;">🎯 Interactive Field Builder</h4>
-                    <p style="color: #718096; margin-bottom: 15px;">Click on column names below to build formulas visually:</p>
-                    
-                    <div id="availableFields" style="margin-bottom: 15px;">
-                        <div style="font-weight: 600; margin-bottom: 10px;">Available Columns:</div>
-                        <div id="fieldButtons"></div>
+            <!-- Admin Mode -->
+            <div id="adminMode" class="mode-section active">
+                <!-- Project Management -->
+                <div class="step">
+                    <div class="step-title">
+                        <div class="step-number">📁</div>
+                        Project Management
                     </div>
                     
-                    <div style="display: grid; grid-template-columns: 1fr auto; gap: 15px; align-items: end;">
+                    <div class="project-panel">
+                        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 15px;">
+                            <h3>Your Projects</h3>
+                            <button onclick="createNewProject()" style="width: auto; padding: 10px 20px;">
+                                ➕ Create New Project
+                            </button>
+                        </div>
+                        
+                        <div id="projectList" class="project-list">
+                            <!-- Projects will be loaded here -->
+                        </div>
+                    </div>
+                </div>
+                
+                <!-- Project Setup -->
+                <div class="step" id="projectSetupStep" style="display: none;">
+                    <div class="step-title">
+                        <div class="step-number">⚙️</div>
+                        Project Setup: <span id="currentProjectName">New Project</span>
+                    </div>
+                    
+                    <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 20px; margin-bottom: 20px;">
                         <div>
-                            <label style="display: block; font-weight: 600; margin-bottom: 8px;">Build Formula:</label>
-                            <input type="text" id="formulaBuilder" placeholder="Click field buttons or type formula..." style="font-family: monospace;">
+                            <label style="display: block; font-weight: 600; margin-bottom: 8px;">Project Name:</label>
+                            <input type="text" id="projectNameInput" placeholder="Enter project name">
                         </div>
-                        <button onclick="insertCommonFormula()" style="width: auto;">⚡ Quick Formulas</button>
+                        <div>
+                            <label style="display: block; font-weight: 600; margin-bottom: 8px;">Base Folder (Google Drive):</label>
+                            <input type="text" id="baseFolderInput" placeholder="Enter base folder name">
+                        </div>
                     </div>
                     
-                    <div id="quickFormulaMenu" style="display: none; margin-top: 15px; padding: 15px; background: white; border-radius: 8px; border: 1px solid #d1d5db;">
-                        <div style="font-weight: 600; margin-bottom: 10px;">Quick Formula Templates:</div>
-                        <div class="quick-formula-grid">
-                            <button onclick="insertFormula('SUM({Hours})')" class="field-button">SUM({Hours})</button>
-                            <button onclick="insertFormula('IF({Hours}>8,{Hours}-8,0)')" class="field-button">Overtime Hours</button>
-                            <button onclick="insertFormula('ROUND({Hours}*{Rate},2)')" class="field-button">Hours × Rate</button>
-                            <button onclick="insertFormula('CONCATENATE({Employee},\" - \",{Department})')" class="field-button">Combine Text</button>
-                            <button onclick="insertFormula('MAX({Hours},8)')" class="field-button">MAX(Hours,8)</button>
-                            <button onclick="insertFormula('MIN({Hours},40)')" class="field-button">MIN(Hours,40)</button>
+                    <div style="margin-bottom: 20px;">
+                        <label style="display: block; font-weight: 600; margin-bottom: 8px;">Timesheet File:</label>
+                        <div class="file-input" id="timesheetInput">
+                            <input type="file" id="timesheetFile" accept=".xlsx,.xls" />
+                            <label for="timesheetFile" class="file-input-label">
+                                <div style="font-size: 2rem; margin-bottom: 10px;">📊</div>
+                                <div><strong>Upload KDT Timesheet (Excel format)</strong></div>
+                                <div style="color: #a0aec0; margin-top: 5px;">Or drag and drop here</div>
+                            </label>
                         </div>
                     </div>
+                    
+                    <div id="timesheetPreview"></div>
                 </div>
                 
-                <div style="margin-top: 20px; padding: 15px; background: #e2f1e8; border-radius: 8px; border-left: 4px solid #5a6c57;">
-                    <h4 style="color: #2d4a3e; margin-bottom: 10px;">📝 Google Sheets Style Formulas:</h4>
-                    <div style="color: #5a6c57; line-height: 1.6; font-size: 0.9rem;">
-                        <strong>Functions Available:</strong> SUM, IF, ROUND, MAX, MIN, ABS, CONCATENATE, UPPER, LOWER, LEFT, RIGHT, MID<br>
-                        <strong>Reference columns:</strong> Use {Column_Name} syntax<br>
-                        <strong>Examples:</strong><br>
-                        • <code>IF({Hours}>8,{Hours}-8,0)</code> - Calculate overtime<br>
-                        • <code>ROUND({Hours}*{Rate},2)</code> - Round to 2 decimal places<br>
-                        • <code>CONCATENATE({Employee}," - ",{Department})</code> - Join text<br>
-                        • <code>SUM({Hours},{Overtime})</code> - Add multiple fields
+                <!-- PDF Template Upload -->
+                <div class="step" id="pdfTemplateStep" style="display: none;">
+                    <div class="step-title">
+                        <div class="step-number">📋</div>
+                        Upload PDF Templates
+                    </div>
+                    
+                    <div style="display: grid; grid-template-columns: 1fr auto; gap: 15px; margin-bottom: 20px;">
+                        <div class="file-input" id="pdfInput">
+                            <input type="file" id="pdfFile" accept=".pdf" multiple />
+                            <label for="pdfFile" class="file-input-label">
+                                <div style="font-size: 2rem; margin-bottom: 10px;">📋</div>
+                                <div><strong>Upload CTR and Shift Ticket PDFs</strong></div>
+                                <div style="color: #a0aec0; margin-top: 5px;">Or drag and drop here</div>
+                            </label>
+                        </div>
+                        <button onclick="clearAllForms()" class="btn-danger" style="height: fit-content; width: auto; padding: 15px 20px;">
+                            Clear All
+                        </button>
+                    </div>
+                    
+                    <div id="pdfFormsPreview"></div>
+                    
+                    <div style="margin-top: 20px;">
+                        <button onclick="saveProject()" class="btn-success">
+                            Save Project
+                        </button>
+                    </div>
+                </div>
+            </div>
+            
+            <!-- User Mode -->
+            <div id="userMode" class="mode-section">
+                <!-- Project Selection -->
+                <div class="step">
+                    <div class="step-title">
+                        <div class="step-number">🎯</div>
+                        Select Project
+                    </div>
+                    
+                    <div id="userProjectList" class="project-list">
+                        <!-- Available projects will be shown here -->
                     </div>
                 </div>
                 
-                <div id="mappingPreview"></div>
-            </div>
-            
-            <!-- Step 3: Upload PDF Forms -->
-            <div class="step">
-                <div class="step-title">
-                    <div class="step-number">3</div>
-                    Upload PDF Forms
-                </div>
-                <p style="margin-bottom: 20px; color: #718096;">Upload multiple PDF forms (CTR, Shift Ticket, etc.).</p>
-                
-                <div style="display: grid; grid-template-columns: 1fr auto; gap: 15px; margin-bottom: 20px;">
-                    <div class="file-input" id="pdfInput">
-                        <input type="file" id="pdfFile" accept=".pdf" multiple />
-                        <label for="pdfFile" class="file-input-label">
-                            <div style="font-size: 2rem; margin-bottom: 10px;">📋</div>
-                            <div><strong>Click to upload PDF forms (multiple files supported)</strong></div>
-                            <div style="color: #a0aec0; margin-top: 5px;">Or drag and drop here</div>
-                        </label>
+                <!-- Fire Name Setup -->
+                <div class="step" id="fireNameStep" style="display: none;">
+                    <div class="step-title">
+                        <div class="step-number">🔥</div>
+                        Fire Name & Setup
                     </div>
-                    <button onclick="clearAllForms()" style="height: fit-content; background: #dc3545; width: auto; padding: 15px 20px;">
-                        🗑️ Clear All
+                    
+                    <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 20px; margin-bottom: 20px;">
+                        <div>
+                            <label style="display: block; font-weight: 600; margin-bottom: 8px;">Fire Name:</label>
+                            <input type="text" id="fireNameInput" placeholder="Enter fire name (e.g., Canyon Fire 2024)">
+                        </div>
+                        <div>
+                            <label style="display: block; font-weight: 600; margin-bottom: 8px;">Your Name:</label>
+                            <input type="text" id="userNameInput" placeholder="Enter your name">
+                        </div>
+                    </div>
+                    
+                    <button onclick="setupFireProject()" class="btn-success">
+                        Create Fire Project
                     </button>
+                    
+                    <div id="fireSetupStatus"></div>
                 </div>
                 
-                <div id="pdfFormsPreview"></div>
-            </div>
-            
-            <!-- Step 4: Fill Forms & Download -->
-            <div class="step">
-                <div class="step-title">
-                    <div class="step-number">4</div>
-                    Fill Forms & Download
+                <!-- Day Selection & Preview -->
+                <div class="step" id="daySelectionStep" style="display: none;">
+                    <div class="step-title">
+                        <div class="step-number">📅</div>
+                        Select Day & Generate PDFs
+                    </div>
+                    
+                    <div id="daySelector" class="day-grid">
+                        <!-- Day options will be populated here -->
+                    </div>
+                    
+                    <div id="selectedDayPreview" style="display: none;">
+                        <h4>Selected Day Summary</h4>
+                        <div id="dayEmployeePreview" class="employee-preview">
+                            <!-- Employee data for selected day will be shown here -->
+                        </div>
+                        
+                        <div style="margin: 20px 0; padding: 15px; background: #e8f5e8; border-radius: 8px;">
+                            <h4>PDF Generation Summary</h4>
+                            <div id="pdfSummary"></div>
+                        </div>
+                        
+                        <button onclick="generatePDFs()" id="generateBtn" class="btn-success">
+                            Generate & Download PDFs
+                        </button>
+                    </div>
+                    
+                    <div id="userStatusMessage"></div>
                 </div>
-                <p style="margin-bottom: 20px; color: #718096;">Fill all PDF forms with the selected day's data and download the completed forms.</p>
-                
-                <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 15px; margin-bottom: 20px;">
-                    <button id="fillAllFormsBtn" disabled onclick="fillAllForms()">
-                        📝 Fill All Forms & Download
-                    </button>
-                    <button id="fillSelectedFormBtn" disabled onclick="fillSelectedForm()">
-                        📄 Fill Selected Form Only
-                    </button>
-                </div>
-                
-                <div id="formSelector" style="margin-bottom: 20px;">
-                    <label style="display: block; font-weight: 600; margin-bottom: 10px;">Select Form to Fill Individually:</label>
-                    <select id="singleFormSelect" disabled>
-                        <option value="">Upload forms first</option>
-                    </select>
-                </div>
-                
-                <div id="statusMessage"></div>
             </div>
         </div>
     </div>
 
     <script>
         // Global variables
-        let csvData = [];
-        let selectedDayData = null;
-        let pdfFiles = [];
-        let mappingRules = [];
-        let processedData = {};
+        let projects = [];
+        let currentProject = null;
+        let timesheetData = null;
+        let pdfTemplates = [];
+        let selectedDay = null;
         let isAuthenticated = false;
         let accessToken = null;
         let tokenClient;
+        let currentMode = 'admin';
         
-        // Google API configuration with your actual credentials
+        // Google API configuration
         const CLIENT_ID = '366876817577-1va8eaifrnvu76dl15chgvcqlvcc6af0.apps.googleusercontent.com';
         const SCOPES = 'https://www.googleapis.com/auth/spreadsheets https://www.googleapis.com/auth/drive.file';
-        
-        // Google Sheets style formula functions
-        const formulaFunctions = {
-            SUM: (...args) => args.reduce((a, b) => parseFloat(a || 0) + parseFloat(b || 0), 0),
-            IF: (condition, trueVal, falseVal) => condition ? trueVal : falseVal,
-            ROUND: (num, decimals = 0) => Math.round(parseFloat(num || 0) * Math.pow(10, decimals)) / Math.pow(10, decimals),
-            MAX: (...args) => Math.max(...args.map(a => parseFloat(a || 0))),
-            MIN: (...args) => Math.min(...args.map(a => parseFloat(a || 0))),
-            ABS: (num) => Math.abs(parseFloat(num || 0)),
-            CONCATENATE: (...args) => args.join(''),
-            UPPER: (text) => String(text || '').toUpperCase(),
-            LOWER: (text) => String(text || '').toLowerCase(),
-            LEFT: (text, num) => String(text || '').substring(0, parseInt(num || 0)),
-            RIGHT: (text, num) => String(text || '').substring(String(text || '').length - parseInt(num || 0)),
-            MID: (text, start, length) => String(text || '').substring(parseInt(start || 0) - 1, parseInt(start || 0) - 1 + parseInt(length || 0))
-        };
-        
-        // Mapping templates specific to KDT forms
-        const mappingTemplates = {
-            ctr_daily: [
-                { pdfField: 'employee_name', formula: '{Employee}', description: 'Employee Name' },
-                { pdfField: 'date', formula: '{Date}', description: 'Work Date' },
-                { pdfField: 'start_time', formula: '{Start_Time}', description: 'Start Time' },
-                { pdfField: 'end_time', formula: '{End_Time}', description: 'End Time' },
-                { pdfField: 'regular_hours', formula: 'IF({Hours}>8,8,{Hours})', description: 'Regular Hours (max 8)' },
-                { pdfField: 'overtime_hours', formula: 'IF({Hours}>8,{Hours}-8,0)', description: 'Overtime Hours' },
-                { pdfField: 'total_hours', formula: '{Hours}', description: 'Total Hours' },
-                { pdfField: 'job_number', formula: '{Job_Number}', description: 'Job Number' },
-                { pdfField: 'location', formula: '{Location}', description: 'Work Location' },
-                { pdfField: 'supervisor', formula: '{Supervisor}', description: 'Supervisor' }
-            ],
-            shift_ticket: [
-                { pdfField: 'employee', formula: '{Employee}', description: 'Employee Name' },
-                { pdfField: 'shift_date', formula: '{Date}', description: 'Shift Date' },
-                { pdfField: 'shift_start', formula: '{Start_Time}', description: 'Shift Start' },
-                { pdfField: 'shift_end', formula: '{End_Time}', description: 'Shift End' },
-                { pdfField: 'break_time', formula: 'IF({Break_Duration},"",30)', description: 'Break Time (default 30 min)' },
-                { pdfField: 'net_hours', formula: '{Hours}-({Break_Duration}/60)', description: 'Net Working Hours' },
-                { pdfField: 'equipment', formula: '{Equipment}', description: 'Equipment Used' },
-                { pdfField: 'work_description', formula: '{Description}', description: 'Work Description' },
-                { pdfField: 'materials', formula: '{Materials}', description: 'Materials Used' }
-            ],
-            timesheet: [
-                { pdfField: 'employee_name', formula: '{Employee}', description: 'Employee Name' },
-                { pdfField: 'date', formula: '{Date}', description: 'Work Date' },
-                { pdfField: 'start_time', formula: '{Start_Time}', description: 'Start Time' },
-                { pdfField: 'end_time', formula: '{End_Time}', description: 'End Time' },
-                { pdfField: 'regular_hours', formula: 'IF({Hours}>8,8,{Hours})', description: 'Regular Hours (max 8)' },
-                { pdfField: 'overtime_hours', formula: 'IF({Hours}>8,{Hours}-8,0)', description: 'Overtime Hours' },
-                { pdfField: 'total_hours', formula: '{Hours}', description: 'Total Hours' },
-                { pdfField: 'department', formula: '{Department}', description: 'Department' }
-            ]
-        };
         
         // Initialize app
         window.addEventListener('load', function() {
             initializeGoogleAPI();
             setupEventListeners();
-            showStatus('🎯 KDT Daily CTR/Shift Ticket Converter ready! Connect to Google Drive to start.', 'info');
+            loadProjects();
+            showStatus('KDT Auto-Generator ready! Connect to Google Drive to start.', 'info');
         });
         
-        // Initialize Google API
-        function initializeGoogleAPI() {
-            showAuthStatus('🔄 Loading Google APIs...', 'info');
+        function switchMode(mode) {
+            currentMode = mode;
             
-            // Wait for Google Identity Services to load
+            // Update mode buttons
+            document.querySelectorAll('.mode-btn').forEach(btn => btn.classList.remove('active'));
+            event.target.classList.add('active');
+            
+            // Show/hide mode sections
+            document.querySelectorAll('.mode-section').forEach(section => section.classList.remove('active'));
+            document.getElementById(mode + 'Mode').classList.add('active');
+            
+            if (mode === 'user') {
+                loadUserProjects();
+            }
+        }
+        
+        function initializeGoogleAPI() {
+            showAuthStatus('Loading Google APIs...', 'info');
+            
             const checkGoogle = () => {
                 if (typeof google !== 'undefined' && google.accounts) {
                     tokenClient = google.accounts.oauth2.initTokenClient({
                         client_id: CLIENT_ID,
                         scope: SCOPES,
                         callback: (tokenResponse) => {
-                            console.log('🔑 OAuth successful');
                             isAuthenticated = true;
                             accessToken = tokenResponse.access_token;
                             
-                            document.getElementById('authorizeBtn').innerHTML = '✅ Connected to Google Drive';
+                            document.getElementById('authorizeBtn').innerHTML = 'Connected to Google Drive';
                             document.getElementById('authorizeBtn').disabled = true;
-                            showAuthStatus('✅ Successfully connected to Google Drive!', 'success');
+                            showAuthStatus('Successfully connected to Google Drive!', 'success');
                         },
                     });
                     
-                    showAuthStatus('🔗 Ready to connect. Click the button to authorize Google Drive access.', 'info');
+                    showAuthStatus('Ready to connect. Click the button to authorize Google Drive access.', 'info');
                 } else {
                     setTimeout(checkGoogle, 100);
                 }
@@ -671,12 +619,9 @@
         }
         
         function handleAuthClick() {
-            console.log('🔘 Connect button clicked');
             if (!isAuthenticated && tokenClient) {
-                showAuthStatus('🔄 Requesting Google Drive access...', 'info');
+                showAuthStatus('Requesting Google Drive access...', 'info');
                 tokenClient.requestAccessToken();
-            } else if (!tokenClient) {
-                showAuthStatus('❌ Google APIs not ready. Please refresh the page.', 'error');
             }
         }
         
@@ -684,670 +629,610 @@
             document.getElementById('authStatus').innerHTML = `<div class="status ${type}" style="margin: 0;">${message}</div>`;
         }
         
-        // Setup event listeners
         function setupEventListeners() {
+            document.getElementById('timesheetFile').addEventListener('change', handleTimesheetUpload);
             document.getElementById('pdfFile').addEventListener('change', handlePDFUpload);
-            document.getElementById('daySelect').addEventListener('change', handleDaySelection);
+        }
+        
+        // Project Management
+        function loadProjects() {
+            const savedProjects = localStorage.getItem('kdtProjects');
+            projects = savedProjects ? JSON.parse(savedProjects) : [];
+            renderProjectList();
+        }
+        
+        function renderProjectList() {
+            const container = document.getElementById('projectList');
             
-            // Drag and drop for PDF files
-            const pdfInput = document.getElementById('pdfInput');
-            pdfInput.addEventListener('dragover', (e) => {
-                e.preventDefault();
-                pdfInput.querySelector('.file-input-label').style.borderColor = '#5a6c57';
-            });
-            pdfInput.addEventListener('dragleave', (e) => {
-                e.preventDefault();
-                pdfInput.querySelector('.file-input-label').style.borderColor = '#6c757d';
-            });
-            pdfInput.addEventListener('drop', (e) => {
-                e.preventDefault();
-                pdfInput.querySelector('.file-input-label').style.borderColor = '#6c757d';
-                const files = e.dataTransfer.files;
-                if (files.length > 0) {
-                    document.getElementById('pdfFile').files = files;
-                    handlePDFUpload({ target: { files } });
-                }
-            });
-        }
-        
-        function extractSheetId(url) {
-            const match = url.match(/\/spreadsheets\/d\/([a-zA-Z0-9-_]+)/);
-            return match ? match[1] : null;
-        }
-        
-        async function loadGoogleSheet() {
-            const sheetUrl = document.getElementById('sheetUrl').value.trim();
-            if (!sheetUrl) {
-                showStatus('❌ Please enter a Google Sheets URL.', 'error');
+            if (projects.length === 0) {
+                container.innerHTML = '<p style="color: #718096; text-align: center; padding: 40px;">No projects yet. Create your first project!</p>';
                 return;
             }
             
-            if (!isAuthenticated) {
-                showStatus('❌ Please connect to Google Drive first.', 'error');
-                return;
-            }
-            
-            try {
-                showStatus('🔄 Loading Google Sheet data...', 'info');
-                
-                const sheetId = extractSheetId(sheetUrl);
-                if (!sheetId) {
-                    throw new Error('Invalid Google Sheets URL. Please check the URL format.');
-                }
-                
-                // Use fetch with OAuth token instead of gapi
-                const response = await fetch(`https://sheets.googleapis.com/v4/spreadsheets/${sheetId}/values/A:ZZ`, {
-                    headers: {
-                        'Authorization': `Bearer ${accessToken}`
-                    }
-                });
-                
-                if (!response.ok) {
-                    throw new Error(`Failed to load sheet: ${response.status} ${response.statusText}`);
-                }
-                
-                const data = await response.json();
-                const values = data.values;
-                
-                if (!values || values.length === 0) {
-                    throw new Error('No data found in the spreadsheet.');
-                }
-                
-                const headers = values[0];
-                csvData = [];
-                
-                for (let i = 1; i < values.length; i++) {
-                    const row = {};
-                    headers.forEach((header, index) => {
-                        row[header] = values[i][index] || '';
-                    });
-                    csvData.push(row);
-                }
-                
-                displaySheetPreview();
-                populateDaySelector();
-                updateFieldButtons();
-                
-                showStatus(`✅ Google Sheet loaded successfully! Found ${csvData.length} rows of data.`, 'success');
-                
-            } catch (error) {
-                console.error('Error loading Google Sheet:', error);
-                showStatus('❌ Error loading Google Sheet: ' + error.message, 'error');
-            }
-        }
-        
-        function displaySheetPreview() {
-            const preview = document.getElementById('sheetPreview');
-            if (csvData.length === 0) {
-                preview.innerHTML = '';
-                return;
-            }
-            
-            const sampleData = csvData.slice(0, 3);
-            const headers = Object.keys(csvData[0]);
-            
-            let html = '<div class="preview"><h4>📊 Google Sheet Preview (first 3 rows)</h4>';
-            sampleData.forEach(row => {
-                html += '<div class="data-row">';
-                headers.forEach(header => {
-                    html += `
-                        <div class="data-item">
-                            <div class="data-label">${header}</div>
-                            <div class="data-value">${row[header] || ''}</div>
-                        </div>
-                    `;
-                });
-                html += '</div>';
-            });
-            html += '</div>';
-            
-            preview.innerHTML = html;
-        }
-        
-        function populateDaySelector() {
-            const select = document.getElementById('daySelect');
-            select.innerHTML = '<option value="">Select a day...</option>';
-            
-            const possibleDateColumns = Object.keys(csvData[0]).filter(key => 
-                key.toLowerCase().includes('date') || 
-                key.toLowerCase().includes('day') ||
-                key.toLowerCase().includes('time')
-            );
-            
-            if (possibleDateColumns.length > 0) {
-                const dateColumn = possibleDateColumns[0];
-                const uniqueDates = [...new Set(csvData.map(row => row[dateColumn]).filter(date => date))];
-                
-                uniqueDates.forEach((date, index) => {
-                    const option = document.createElement('option');
-                    option.value = index;
-                    option.textContent = `${date}`;
-                    select.appendChild(option);
-                });
-            } else {
-                csvData.forEach((row, index) => {
-                    const option = document.createElement('option');
-                    option.value = index;
-                    option.textContent = `Row ${index + 1}`;
-                    select.appendChild(option);
-                });
-            }
-            
-            select.disabled = false;
-        }
-        
-        function handleDaySelection(event) {
-            const selectedIndex = parseInt(event.target.value);
-            if (isNaN(selectedIndex)) {
-                selectedDayData = null;
-                document.getElementById('selectedDataPreview').innerHTML = '';
-                document.getElementById('mappingStep').style.display = 'none';
-                updateFillButtons();
-                return;
-            }
-            
-            selectedDayData = csvData[selectedIndex];
-            displaySelectedData();
-            document.getElementById('mappingStep').style.display = 'block';
-            
-            if (mappingRules.length === 0) {
-                loadMappingTemplate('ctr_daily');
-            } else {
-                renderMappingRows();
-            }
-            
-            updateFillButtons();
-        }
-        
-        function displaySelectedData() {
-            const preview = document.getElementById('selectedDataPreview');
-            if (!selectedDayData) {
-                preview.innerHTML = '';
-                return;
-            }
-            
-            const headers = Object.keys(selectedDayData);
-            let html = '<div class="preview"><h4>📋 Selected Day Data</h4>';
-            html += '<div class="data-row">';
-            headers.forEach(header => {
+            let html = '';
+            projects.forEach((project, index) => {
                 html += `
-                    <div class="data-item">
-                        <div class="data-label">${header}</div>
-                        <div class="data-value">${selectedDayData[header] || ''}</div>
+                    <div class="project-card" onclick="loadProject(${index})">
+                        <h4>${project.name}</h4>
+                        <p style="color: #718096; margin: 10px 0;">
+                            Created: ${new Date(project.created).toLocaleDateString()}
+                        </p>
+                        <p style="color: #718096;">
+                            Base Folder: ${project.baseFolder || 'Not set'}
+                        </p>
+                        <div style="margin-top: 15px;">
+                            <button onclick="event.stopPropagation(); deleteProject(${index})" class="btn-danger" style="width: auto; padding: 8px 15px; font-size: 0.9rem;">
+                                Delete
+                            </button>
+                        </div>
                     </div>
                 `;
             });
-            html += '</div></div>';
             
-            preview.innerHTML = html;
-            updateFieldButtons();
-        }
-        
-        function updateFieldButtons() {
-            const container = document.getElementById('fieldButtons');
-            if (!selectedDayData) {
-                container.innerHTML = '<p style="color: #718096;">Select a day first to see available fields</p>';
-                return;
-            }
-            
-            const fields = Object.keys(selectedDayData);
-            let html = '';
-            fields.forEach(field => {
-                html += `<button onclick="insertField('${field}')" class="field-button">{${field}}</button>`;
-            });
             container.innerHTML = html;
         }
         
-        function insertField(fieldName) {
-            const builder = document.getElementById('formulaBuilder');
-            builder.value += `{${fieldName}}`;
-            builder.focus();
+        function createNewProject() {
+            currentProject = {
+                name: '',
+                created: new Date().toISOString(),
+                baseFolder: '',
+                timesheetData: null,
+                pdfTemplates: []
+            };
+            
+            document.getElementById('projectSetupStep').style.display = 'block';
+            document.getElementById('currentProjectName').textContent = 'New Project';
+            document.getElementById('projectNameInput').value = '';
+            document.getElementById('baseFolderInput').value = '';
         }
         
-        function insertCommonFormula() {
-            const menu = document.getElementById('quickFormulaMenu');
-            menu.style.display = menu.style.display === 'none' ? 'block' : 'none';
+        function loadProject(index) {
+            currentProject = projects[index];
+            document.getElementById('projectSetupStep').style.display = 'block';
+            document.getElementById('currentProjectName').textContent = currentProject.name;
+            document.getElementById('projectNameInput').value = currentProject.name;
+            document.getElementById('baseFolderInput').value = currentProject.baseFolder || '';
+            
+            if (currentProject.timesheetData) {
+                timesheetData = currentProject.timesheetData;
+                displayTimesheetPreview();
+                document.getElementById('pdfTemplateStep').style.display = 'block';
+            }
+            
+            if (currentProject.pdfTemplates) {
+                pdfTemplates = currentProject.pdfTemplates;
+                displayPDFPreview();
+            }
         }
         
-        function insertFormula(formula) {
-            const builder = document.getElementById('formulaBuilder');
-            builder.value = formula;
-            document.getElementById('quickFormulaMenu').style.display = 'none';
-            builder.focus();
+        function deleteProject(index) {
+            if (confirm('Are you sure you want to delete this project?')) {
+                projects.splice(index, 1);
+                localStorage.setItem('kdtProjects', JSON.stringify(projects));
+                renderProjectList();
+            }
         }
         
+        // Timesheet Processing
+        async function handleTimesheetUpload(event) {
+            const file = event.target.files[0];
+            if (!file) return;
+            
+            try {
+                showStatus('Processing timesheet...', 'info');
+                
+                const arrayBuffer = await file.arrayBuffer();
+                const workbook = XLSX.read(arrayBuffer, { cellDates: true });
+                const worksheet = workbook.Sheets[workbook.SheetNames[0]];
+                const jsonData = XLSX.utils.sheet_to_json(worksheet, { header: 1 });
+                
+                // Process the timesheet data
+                timesheetData = processTimesheetData(jsonData);
+                currentProject.timesheetData = timesheetData;
+                
+                displayTimesheetPreview();
+                document.getElementById('pdfTemplateStep').style.display = 'block';
+                
+                showStatus('Timesheet processed successfully!', 'success');
+                
+            } catch (error) {
+                console.error('Error processing timesheet:', error);
+                showStatus('Error processing timesheet: ' + error.message, 'error');
+            }
+        }
+        
+        function processTimesheetData(jsonData) {
+            // Extract fire name from header
+            const fireName = jsonData[0] && jsonData[0][1] ? jsonData[0][1] : 'Unknown Fire';
+            
+            // Extract dates from row 4 (index 3)
+            const dateRow = jsonData[3];
+            const dates = [];
+            
+            // Parse date columns (every 2 columns starting from index 4)
+            for (let i = 4; i < dateRow.length; i += 2) {
+                if (dateRow[i] && dateRow[i + 1]) {
+                    dates.push({
+                        dayName: dateRow[i],
+                        date: dateRow[i + 1],
+                        workedCol: i,
+                        milesCol: i + 1
+                    });
+                }
+            }
+            
+            // Extract employee data
+            const employees = [];
+            
+            for (let i = 5; i < jsonData.length; i++) {
+                const row = jsonData[i];
+                if (!row || !row[0] || typeof row[0] !== 'string') continue;
+                
+                const name = row[0].trim();
+                
+                // Skip header/total rows
+                if (name.toLowerCase().includes('total') || 
+                    name.toLowerCase().includes('combined') ||
+                    name === 'GUARDS' || name === 'MANAGER' || name === 'SUPERVISORS') {
+                    continue;
+                }
+                
+                // Determine classification
+                let classification = 'Guard';
+                for (let j = i - 1; j >= 0; j--) {
+                    const prevRow = jsonData[j];
+                    if (prevRow && prevRow[0]) {
+                        const prevName = String(prevRow[0]).toLowerCase();
+                        if (prevName.includes('manager')) {
+                            classification = 'Manager';
+                            break;
+                        } else if (prevName.includes('supervisor')) {
+                            classification = 'Supervisor';
+                            break;
+                        } else if (prevName.includes('guard')) {
+                            classification = 'Guard';
+                            break;
+                        }
+                    }
+                }
+                
+                employees.push({
+                    name: name,
+                    classification: classification,
+                    rowData: row
+                });
+            }
+            
+            return {
+                fireName: fireName,
+                dates: dates,
+                employees: employees,
+                rawData: jsonData
+            };
+        }
+        
+        function displayTimesheetPreview() {
+            if (!timesheetData) return;
+            
+            const preview = document.getElementById('timesheetPreview');
+            let html = `
+                <div style="background: #f8f9fa; padding: 20px; border-radius: 8px; margin: 20px 0;">
+                    <h4>Timesheet Preview</h4>
+                    <p><strong>Fire Name:</strong> ${timesheetData.fireName}</p>
+                    <p><strong>Dates Available:</strong> ${timesheetData.dates.length} days</p>
+                    <p><strong>Employees:</strong> ${timesheetData.employees.length} total</p>
+                    
+                    <div style="margin-top: 15px;">
+                        <strong>Employee Breakdown:</strong><br>
+            `;
+            
+            const counts = { Guard: 0, Manager: 0, Supervisor: 0 };
+            timesheetData.employees.forEach(emp => {
+                counts[emp.classification]++;
+            });
+            
+            Object.entries(counts).forEach(([type, count]) => {
+                if (count > 0) {
+                    html += `${type}s: ${count} &nbsp;&nbsp;`;
+                }
+            });
+            
+            html += `
+                    </div>
+                    
+                    <div style="margin-top: 15px;">
+                        <strong>Available Dates:</strong><br>
+            `;
+            
+            timesheetData.dates.slice(0, 5).forEach(dateInfo => {
+                const dateStr = dateInfo.date instanceof Date ? 
+                    dateInfo.date.toLocaleDateString() : 
+                    new Date(dateInfo.date).toLocaleDateString();
+                html += `${dateInfo.dayName} ${dateStr} &nbsp;&nbsp;`;
+            });
+            
+            if (timesheetData.dates.length > 5) {
+                html += `... and ${timesheetData.dates.length - 5} more`;
+            }
+            
+            html += '</div></div>';
+            preview.innerHTML = html;
+        }
+        
+        // PDF Template Handling
         function handlePDFUpload(event) {
             const files = Array.from(event.target.files);
             if (!files.length) return;
             
-            pdfFiles = files;
-            document.getElementById('pdfInput').classList.add('has-file');
+            pdfTemplates = [];
+            files.forEach(file => {
+                pdfTemplates.push({
+                    name: file.name,
+                    file: file,
+                    type: file.name.toLowerCase().includes('ctr') ? 'ctr' : 
+                          file.name.toLowerCase().includes('shift') ? 'shift' : 'unknown'
+                });
+            });
+            
+            currentProject.pdfTemplates = pdfTemplates.map(template => ({
+                name: template.name,
+                type: template.type
+            }));
+            
             displayPDFPreview();
-            updateFillButtons();
         }
         
         function displayPDFPreview() {
             const preview = document.getElementById('pdfFormsPreview');
-            if (pdfFiles.length === 0) {
+            if (pdfTemplates.length === 0) {
                 preview.innerHTML = '';
                 return;
             }
             
-            let html = '<div class="preview"><h4>📋 Uploaded PDF Forms</h4>';
-            pdfFiles.forEach((file, index) => {
+            let html = '<div style="background: #f8f9fa; padding: 20px; border-radius: 8px;"><h4>PDF Templates</h4>';
+            pdfTemplates.forEach(template => {
                 html += `
-                    <div class="data-row" style="display: flex; justify-content: space-between; align-items: center;">
+                    <div style="display: flex; justify-content: space-between; align-items: center; padding: 10px; background: white; border-radius: 6px; margin-bottom: 10px;">
                         <div>
-                            <div class="data-label">Form ${index + 1}</div>
-                            <div class="data-value">${file.name}</div>
+                            <strong>${template.name}</strong>
+                            <div style="color: #718096; font-size: 0.9rem;">Type: ${template.type.toUpperCase()}</div>
                         </div>
-                        <button onclick="removePDFForm(${index})" class="delete-mapping" style="width: auto;">
-                            🗑️ Remove
-                        </button>
                     </div>
                 `;
             });
             html += '</div>';
             
             preview.innerHTML = html;
-            
-            const select = document.getElementById('singleFormSelect');
-            select.innerHTML = '<option value="">Select a form...</option>';
-            pdfFiles.forEach((file, index) => {
-                const option = document.createElement('option');
-                option.value = index;
-                option.textContent = file.name;
-                select.appendChild(option);
-            });
-            select.disabled = false;
-            
-            showStatus(`✅ ${pdfFiles.length} PDF form(s) uploaded successfully!`, 'success');
-        }
-        
-        function removePDFForm(index) {
-            pdfFiles.splice(index, 1);
-            displayPDFPreview();
-            updateFillButtons();
         }
         
         function clearAllForms() {
-            pdfFiles = [];
-            document.getElementById('pdfInput').classList.remove('has-file');
+            pdfTemplates = [];
             document.getElementById('pdfFile').value = '';
             displayPDFPreview();
-            updateFillButtons();
-            showStatus('📁 All PDF forms cleared.', 'info');
         }
         
-        function updateFillButtons() {
-            const fillAllBtn = document.getElementById('fillAllFormsBtn');
-            const fillSelectedBtn = document.getElementById('fillSelectedFormBtn');
+        function saveProject() {
+            const projectName = document.getElementById('projectNameInput').value.trim();
+            const baseFolder = document.getElementById('baseFolderInput').value.trim();
             
-            fillAllBtn.disabled = !(selectedDayData && pdfFiles.length > 0 && Object.keys(processedData).length > 0);
-            fillSelectedBtn.disabled = !(selectedDayData && pdfFiles.length > 0 && Object.keys(processedData).length > 0);
-        }
-        
-        function loadMappingTemplate(templateName = null) {
-            if (!templateName) {
-                templateName = document.getElementById('templateSelect').value;
+            if (!projectName) {
+                showStatus('Please enter a project name.', 'error');
+                return;
             }
             
-            if (templateName === 'custom') {
-                mappingRules = [];
+            if (!timesheetData) {
+                showStatus('Please upload a timesheet first.', 'error');
+                return;
+            }
+            
+            currentProject.name = projectName;
+            currentProject.baseFolder = baseFolder;
+            currentProject.updated = new Date().toISOString();
+            
+            const existingIndex = projects.findIndex(p => p.name === projectName);
+            if (existingIndex >= 0) {
+                projects[existingIndex] = currentProject;
             } else {
-                mappingRules = [...mappingTemplates[templateName]];
+                projects.push(currentProject);
             }
             
-            renderMappingRows();
-            updateFillButtons();
+            localStorage.setItem('kdtProjects', JSON.stringify(projects));
+            renderProjectList();
+            
+            showStatus(`Project "${projectName}" saved successfully!`, 'success');
         }
         
-        function renderMappingRows() {
-            const container = document.getElementById('mappingRows');
-            container.innerHTML = '';
+        // User Mode Functions
+        function loadUserProjects() {
+            const container = document.getElementById('userProjectList');
             
-            mappingRules.forEach((rule, index) => {
-                const row = document.createElement('div');
-                row.className = 'mapping-row';
-                row.innerHTML = `
-                    <input type="text" value="${rule.pdfField}" onchange="updateMappingRule(${index}, 'pdfField', this.value)" placeholder="PDF field name">
-                    <div style="display: flex; gap: 5px;">
-                        <textarea onchange="updateMappingRule(${index}, 'formula', this.value)" placeholder="Formula or {Column_Name}" style="flex: 1;">${rule.formula}</textarea>
-                        <button onclick="useBuilderFormula(${index})" style="width: 80px; font-size: 0.8rem; padding: 5px;">Use Builder</button>
+            if (projects.length === 0) {
+                container.innerHTML = '<p style="color: #718096; text-align: center; padding: 40px;">No projects available. Contact your administrator to create projects.</p>';
+                return;
+            }
+            
+            let html = '';
+            projects.forEach((project, index) => {
+                html += `
+                    <div class="project-card" onclick="selectUserProject(${index})">
+                        <h4>${project.name}</h4>
+                        <p style="color: #718096; margin: 10px 0;">
+                            ${project.timesheetData ? project.timesheetData.dates.length : 0} days available
+                        </p>
+                        <p style="color: #718096;">
+                            ${project.timesheetData ? project.timesheetData.employees.length : 0} employees
+                        </p>
                     </div>
-                    <div class="formula-preview" id="preview-${index}">-</div>
-                    <button class="delete-mapping" onclick="deleteMappingRule(${index})">🗑️</button>
                 `;
-                container.appendChild(row);
             });
             
-            updateAllPreviews();
+            container.innerHTML = html;
         }
         
-        function addMappingRow() {
-            mappingRules.push({
-                pdfField: '',
-                formula: '',
-                description: ''
-            });
-            renderMappingRows();
-        }
-        
-        function deleteMappingRule(index) {
-            mappingRules.splice(index, 1);
-            renderMappingRows();
-            updateFillButtons();
-        }
-        
-        function updateMappingRule(index, field, value) {
-            mappingRules[index][field] = value;
-            if (field === 'formula') {
-                updatePreview(index);
-            }
-            updateFillButtons();
-        }
-        
-        function useBuilderFormula(index) {
-            const builderValue = document.getElementById('formulaBuilder').value;
-            if (builderValue) {
-                mappingRules[index].formula = builderValue;
-                renderMappingRows();
-                document.getElementById('formulaBuilder').value = '';
-            }
-        }
-        
-        function updatePreview(index) {
-            if (!selectedDayData) return;
+        function selectUserProject(index) {
+            currentProject = projects[index];
+            timesheetData = currentProject.timesheetData;
+            pdfTemplates = currentProject.pdfTemplates || [];
             
-            const rule = mappingRules[index];
-            const previewElement = document.getElementById(`preview-${index}`);
-            
-            try {
-                const result = evaluateFormula(rule.formula, selectedDayData);
-                previewElement.textContent = result;
-                previewElement.style.color = '#2d4a3e';
-                previewElement.style.background = '#e8f3e8';
-            } catch (error) {
-                previewElement.textContent = 'Error';
-                previewElement.style.color = '#721c24';
-                previewElement.style.background = '#f8d7da';
-            }
+            document.getElementById('fireNameStep').style.display = 'block';
+            showStatus(`Selected project: ${currentProject.name}`, 'success');
         }
         
-        function updateAllPreviews() {
-            mappingRules.forEach((rule, index) => {
-                updatePreview(index);
-            });
-        }
-        
-        function evaluateFormula(formula, data) {
-            if (!formula) return '';
+        function setupFireProject() {
+            const fireName = document.getElementById('fireNameInput').value.trim();
+            const userName = document.getElementById('userNameInput').value.trim();
             
-            if (formula.match(/^\{[^}]+\}$/)) {
-                const columnName = formula.slice(1, -1);
-                return data[columnName] || '';
+            if (!fireName || !userName) {
+                showStatus('Please enter both fire name and your name.', 'error');
+                return;
             }
             
-            let processedFormula = formula;
-            const columnMatches = formula.match(/\{([^}]+)\}/g);
-            if (columnMatches) {
-                columnMatches.forEach(match => {
-                    const columnName = match.slice(1, -1);
-                    const value = data[columnName];
-                    if (value !== undefined && value !== null) {
-                        processedFormula = processedFormula.replace(match, `"${value}"`);
-                    } else {
-                        processedFormula = processedFormula.replace(match, '""');
-                    }
-                });
-            }
+            document.getElementById('daySelectionStep').style.display = 'block';
+            displayDaySelector();
             
-            try {
-                let result = processedFormula;
-                
-                result = result.replace(/SUM\(([^)]+)\)/g, (match, args) => {
-                    const values = args.split(',').map(arg => parseFloat(arg.replace(/"/g, '')) || 0);
-                    return formulaFunctions.SUM(...values);
-                });
-                
-                result = result.replace(/IF\(([^,]+),([^,]+),([^)]+)\)/g, (match, condition, trueVal, falseVal) => {
-                    const conditionResult = Function(`"use strict"; return (${condition.replace(/"/g, '')})`)();
-                    return conditionResult ? trueVal.replace(/"/g, '') : falseVal.replace(/"/g, '');
-                });
-                
-                result = result.replace(/ROUND\(([^,]+),?(\d*)\)/g, (match, num, decimals) => {
-                    const n = parseFloat(num.replace(/"/g, '')) || 0;
-                    const d = parseInt(decimals) || 0;
-                    return formulaFunctions.ROUND(n, d);
-                });
-                
-                result = result.replace(/(MAX|MIN)\(([^)]+)\)/g, (match, func, args) => {
-                    const values = args.split(',').map(arg => parseFloat(arg.replace(/"/g, '')) || 0);
-                    return formulaFunctions[func](...values);
-                });
-                
-                result = result.replace(/CONCATENATE\(([^)]+)\)/g, (match, args) => {
-                    const values = args.split(',').map(arg => arg.replace(/"/g, ''));
-                    return formulaFunctions.CONCATENATE(...values);
-                });
-                
-                if (typeof result === 'string' && (result.includes('+') || result.includes('-') || result.includes('*') || result.includes('/'))) {
-                    const mathResult = Function(`"use strict"; return (${result.replace(/"/g, '')})`)();
-                    if (!isNaN(mathResult)) {
-                        result = mathResult;
-                    }
-                }
-                
-                if (typeof result === 'string') {
-                    result = result.replace(/^"|"$/g, '');
-                }
-                
-                return result;
-                
-            } catch (error) {
-                throw new Error(`Formula error: ${error.message}`);
-            }
+            showStatus(`Fire project "${fireName}" set up for ${userName}!`, 'success');
         }
         
-        function applyMappings() {
-            if (!selectedDayData) return;
+        function displayDaySelector() {
+            if (!timesheetData || !timesheetData.dates) return;
             
-            processedData = {};
-            let successCount = 0;
-            let errorCount = 0;
-            const results = [];
+            const container = document.getElementById('daySelector');
+            let html = '';
             
-            mappingRules.forEach(rule => {
-                if (rule.pdfField && rule.formula) {
-                    try {
-                        const result = evaluateFormula(rule.formula, selectedDayData);
-                        processedData[rule.pdfField] = result;
-                        results.push(`✅ ${rule.pdfField}: ${result}`);
-                        successCount++;
-                    } catch (error) {
-                        results.push(`❌ ${rule.pdfField}: ${error.message}`);
-                        errorCount++;
-                    }
-                }
-            });
-            
-            const previewContainer = document.getElementById('mappingPreview');
-            let html = `
-                <div class="preview">
-                    <h4>📊 Processed Data Preview</h4>
-                    <div style="margin-bottom: 15px;">
-                        <span style="color: #155724; font-weight: 600;">${successCount} successful</span> • 
-                        <span style="color: #721c24; font-weight: 600;">${errorCount} errors</span>
+            timesheetData.dates.forEach((dateInfo, index) => {
+                const dateStr = dateInfo.date instanceof Date ? 
+                    dateInfo.date.toLocaleDateString() : 
+                    new Date(dateInfo.date).toLocaleDateString();
+                
+                // Calculate summary for this day
+                const daySummary = calculateDaySummary(dateInfo);
+                
+                html += `
+                    <div class="day-card" onclick="selectDay(${index})">
+                        <div class="day-header">${dateInfo.dayName} ${dateStr}</div>
+                        <div class="day-summary">
+                            People: ${daySummary.totalPeople}<br>
+                            Miles: ${daySummary.totalMiles}
+                        </div>
                     </div>
-                    <div style="max-height: 200px; overflow-y: auto; background: #f8f9fa; padding: 15px; border-radius: 8px;">
-            `;
-            
-            results.forEach(result => {
-                html += `<div style="margin-bottom: 5px; font-family: monospace; font-size: 0.9rem;">${result}</div>`;
+                `;
             });
             
-            html += '</div></div>';
-            previewContainer.innerHTML = html;
-            
-            updateFillButtons();
-            showStatus(`✅ Mappings applied! ${successCount} fields processed successfully.`, 'success');
+            container.innerHTML = html;
         }
         
-        async function fillAllForms() {
-            if (!selectedDayData || pdfFiles.length === 0 || !processedData || Object.keys(processedData).length === 0) {
-                showStatus('❌ Please apply mappings first before filling forms.', 'error');
-                return;
-            }
+        function calculateDaySummary(dateInfo) {
+            let totalPeople = 0;
+            let totalMiles = 0;
             
-            try {
-                showStatus('🔄 Processing all PDF forms...', 'info');
+            timesheetData.employees.forEach(emp => {
+                const worked = emp.rowData[dateInfo.workedCol];
+                const miles = emp.rowData[dateInfo.milesCol] || 0;
                 
-                const filledForms = [];
-                let successCount = 0;
-                
-                for (let i = 0; i < pdfFiles.length; i++) {
-                    const file = pdfFiles[i];
-                    try {
-                        showStatus(`🔄 Processing form ${i + 1}/${pdfFiles.length}: ${file.name}...`, 'info');
-                        const result = await fillSinglePDFForm(file);
-                        filledForms.push(result);
-                        successCount++;
-                    } catch (error) {
-                        console.error(`Error filling form ${file.name}:`, error);
-                        filledForms.push({ name: file.name, error: error.message });
-                    }
+                // Count as 1 day if worked between 8-16 hours
+                if (worked >= 8 && worked <= 16) {
+                    totalPeople++;
                 }
-                
-                // Download all filled forms
-                for (let i = 0; i < filledForms.length; i++) {
-                    const result = filledForms[i];
-                    if (result.pdfBytes) {
-                        setTimeout(() => downloadPDF(result.pdfBytes, result.filename), i * 500);
-                    }
-                }
-                
-                showStatus(`✅ All forms processed and downloaded! ${successCount}/${pdfFiles.length} forms completed successfully.`, 'success');
-                
-                let reportHtml = '<div style="margin-top: 15px; padding: 15px; background: #f8f9fa; border-radius: 8px;"><strong>📋 Processing Report:</strong><br><br>';
-                filledForms.forEach(result => {
-                    if (result.error) {
-                        reportHtml += `❌ <strong>${result.name}</strong>: ${result.error}<br>`;
-                    } else {
-                        reportHtml += `✅ <strong>${result.name}</strong>: ${result.fieldsCount} fields filled successfully<br>`;
-                    }
-                });
-                reportHtml += '</div>';
-                
-                const statusDiv = document.getElementById('statusMessage');
-                statusDiv.innerHTML += reportHtml;
-                
-            } catch (error) {
-                console.error('Error filling all forms:', error);
-                showStatus('❌ Error processing forms: ' + error.message, 'error');
-            }
+                totalMiles += miles;
+            });
+            
+            return { totalPeople, totalMiles };
         }
         
-        async function fillSelectedForm() {
-            const selectedIndex = parseInt(document.getElementById('singleFormSelect').value);
-            if (isNaN(selectedIndex) || !pdfFiles[selectedIndex]) {
-                showStatus('❌ Please select a form to fill.', 'error');
-                return;
-            }
+        function selectDay(index) {
+            selectedDay = timesheetData.dates[index];
             
-            if (!processedData || Object.keys(processedData).length === 0) {
-                showStatus('❌ Please apply mappings first before filling the form.', 'error');
-                return;
-            }
+            // Clear previous selection
+            document.querySelectorAll('.day-card').forEach(card => card.classList.remove('selected'));
+            event.target.closest('.day-card').classList.add('selected');
             
-            try {
-                const file = pdfFiles[selectedIndex];
-                const result = await fillSinglePDFForm(file);
-                downloadPDF(result.pdfBytes, result.filename);
-                showStatus(`✅ Form "${file.name}" filled successfully! ${result.fieldsCount} fields populated.`, 'success');
-            } catch (error) {
-                console.error('Error filling selected form:', error);
-                showStatus('❌ Error filling form: ' + error.message, 'error');
-            }
+            displaySelectedDayPreview();
+            document.getElementById('selectedDayPreview').style.display = 'block';
         }
         
-        async function fillSinglePDFForm(file) {
-            const arrayBuffer = await file.arrayBuffer();
-            const pdfDoc = await PDFLib.PDFDocument.load(arrayBuffer);
-            const form = pdfDoc.getForm();
-            const fields = form.getFields();
+        function displaySelectedDayPreview() {
+            if (!selectedDay) return;
             
-            let filledCount = 0;
+            const dateStr = selectedDay.date instanceof Date ? 
+                selectedDay.date.toLocaleDateString() : 
+                new Date(selectedDay.date).toLocaleDateString();
             
-            fields.forEach(field => {
-                const fieldName = field.getName().toLowerCase().trim();
+            // Get employee data for this day
+            const dayEmployees = [];
+            timesheetData.employees.forEach(emp => {
+                const worked = emp.rowData[selectedDay.workedCol];
+                const miles = emp.rowData[selectedDay.milesCol] || 0;
                 
-                let value = null;
-                let matchedKey = null;
-                
-                Object.keys(processedData).forEach(key => {
-                    if (key.toLowerCase().trim() === fieldName) {
-                        value = processedData[key];
-                        matchedKey = key;
-                    }
-                });
-                
-                if (value === null) {
-                    Object.keys(processedData).forEach(key => {
-                        const keyLower = key.toLowerCase().trim();
-                        if (fieldName.includes(keyLower) || keyLower.includes(fieldName)) {
-                            value = processedData[key];
-                            matchedKey = key;
-                        }
+                if (worked >= 8 && worked <= 16) { // Only include employees who worked
+                    dayEmployees.push({
+                        name: emp.name,
+                        classification: emp.classification,
+                        worked: worked,
+                        miles: miles
                     });
                 }
+            });
+            
+            // Display employee preview
+            let html = `
+                <div class="employee-row header">
+                    <div>Name</div>
+                    <div>Classification</div>
+                    <div>Hours</div>
+                    <div>Miles</div>
+                </div>
+            `;
+            
+            dayEmployees.forEach(emp => {
+                html += `
+                    <div class="employee-row">
+                        <div>${emp.name}</div>
+                        <div>${emp.classification}</div>
+                        <div>${emp.worked}</div>
+                        <div>${emp.miles}</div>
+                    </div>
+                `;
+            });
+            
+            document.getElementById('dayEmployeePreview').innerHTML = html;
+            
+            // Calculate totals
+            const totalPeople = dayEmployees.length;
+            const totalMiles = dayEmployees.reduce((sum, emp) => sum + emp.miles, 0);
+            
+            // Display PDF summary
+            const summaryHtml = `
+                <p><strong>Date:</strong> ${selectedDay.dayName} ${dateStr}</p>
+                <p><strong>Total People Worked:</strong> ${totalPeople} days</p>
+                <p><strong>Total Miles:</strong> ${totalMiles}</p>
+                <p><strong>Fire Name:</strong> ${document.getElementById('fireNameInput').value}</p>
+                <p><strong>Contractor/Agency:</strong> Knight Division Tactical</p>
+                <p><strong>Operator:</strong> KDT</p>
+            `;
+            
+            document.getElementById('pdfSummary').innerHTML = summaryHtml;
+        }
+        
+        async function generatePDFs() {
+            if (!selectedDay) {
+                showStatus('Please select a day first.', 'error');
+                return;
+            }
+            
+            try {
+                showStatus('Generating PDFs...', 'info');
                 
-                if (value !== null && value !== undefined && value !== '') {
-                    try {
-                        const fieldType = field.constructor.name;
-                        
-                        if (fieldType === 'PDFTextField') {
-                            field.setText(String(value));
-                            filledCount++;
-                        } else if (fieldType === 'PDFCheckBox') {
-                            const truthyValues = [true, 'true', 'yes', '1', 'checked', 'on'];
-                            if (truthyValues.includes(String(value).toLowerCase())) {
-                                field.check();
-                                filledCount++;
-                            }
-                        } else if (fieldType === 'PDFDropdown') {
-                            try {
-                                field.select(String(value));
-                                filledCount++;
-                            } catch (e) {
-                                const options = field.getOptions();
-                                const closeMatch = options.find(opt => 
-                                    opt.toLowerCase().includes(String(value).toLowerCase())
-                                );
-                                if (closeMatch) {
-                                    field.select(closeMatch);
-                                    filledCount++;
-                                }
-                            }
-                        }
-                    } catch (e) {
-                        console.warn(`Could not fill field ${field.getName()}:`, e);
+                const fireName = document.getElementById('fireNameInput').value;
+                const userName = document.getElementById('userNameInput').value;
+                
+                // Generate CTR PDF
+                if (pdfTemplates.find(t => t.type === 'ctr')) {
+                    await generateCTRPDF(fireName, userName);
+                }
+                
+                // Generate Shift Ticket PDF
+                if (pdfTemplates.find(t => t.type === 'shift')) {
+                    await generateShiftTicketPDF(fireName, userName);
+                }
+                
+                showStatus('PDFs generated and downloaded successfully!', 'success');
+                
+            } catch (error) {
+                console.error('Error generating PDFs:', error);
+                showStatus('Error generating PDFs: ' + error.message, 'error');
+            }
+        }
+        
+        async function generateCTRPDF(fireName, userName) {
+            const ctrTemplate = pdfTemplates.find(t => t.type === 'ctr');
+            if (!ctrTemplate) return;
+            
+            const arrayBuffer = await ctrTemplate.file.arrayBuffer();
+            const pdfDoc = await PDFLib.PDFDocument.load(arrayBuffer);
+            const form = pdfDoc.getForm();
+            
+            // Fill basic fields
+            const dateStr = selectedDay.date instanceof Date ? 
+                selectedDay.date.toLocaleDateString() : 
+                new Date(selectedDay.date).toLocaleDateString();
+            
+            try {
+                // Fill header fields
+                form.getTextField('crew_name').setText('Knight Division Tactical');
+                form.getTextField('fire_name').setText(fireName);
+                form.getTextField('date').setText(dateStr);
+            } catch (e) {
+                console.warn('Some CTR fields not found:', e);
+            }
+            
+            // Fill employee data
+            const dayEmployees = timesheetData.employees.filter(emp => {
+                const worked = emp.rowData[selectedDay.workedCol];
+                return worked >= 8 && worked <= 16;
+            });
+            
+            dayEmployees.forEach((emp, index) => {
+                try {
+                    if (index < 20) { // Assuming 20 rows available
+                        form.getTextField(`name_${index + 1}`).setText(emp.name);
+                        form.getTextField(`classification_${index + 1}`).setText(emp.classification);
+                        form.getTextField(`date_on_${index + 1}`).setText(dateStr);
+                        form.getTextField(`date_off_${index + 1}`).setText(dateStr);
                     }
+                } catch (e) {
+                    console.warn(`CTR field not found for row ${index + 1}`);
                 }
             });
             
             const pdfBytes = await pdfDoc.save();
+            const filename = `${fireName}_${userName}_CTR_${dateStr.replace(/\//g, '-')}.pdf`;
+            downloadPDF(pdfBytes, filename);
+        }
+        
+        async function generateShiftTicketPDF(fireName, userName) {
+            const shiftTemplate = pdfTemplates.find(t => t.type === 'shift');
+            if (!shiftTemplate) return;
             
-            const dateStr = selectedDayData.date || selectedDayData.Date || selectedDayData.DAY || 
-                           new Date().toISOString().split('T')[0];
-            const baseFilename = file.name.replace('.pdf', '');
-            const filename = `${baseFilename}_${dateStr.toString().replace(/[/\\:*?"<>|]/g, '-')}_filled.pdf`;
+            const arrayBuffer = await shiftTemplate.file.arrayBuffer();
+            const pdfDoc = await PDFLib.PDFDocument.load(arrayBuffer);
+            const form = pdfDoc.getForm();
             
-            return {
-                name: file.name,
-                filename: filename,
-                pdfBytes: pdfBytes,
-                fieldsCount: filledCount
-            };
+            const dateStr = selectedDay.date instanceof Date ? 
+                selectedDay.date.toLocaleDateString() : 
+                new Date(selectedDay.date).toLocaleDateString();
+            
+            // Calculate totals
+            const dayEmployees = timesheetData.employees.filter(emp => {
+                const worked = emp.rowData[selectedDay.workedCol];
+                return worked >= 8 && worked <= 16;
+            });
+            
+            const totalPeople = dayEmployees.length;
+            const totalMiles = dayEmployees.reduce((sum, emp) => {
+                return sum + (emp.rowData[selectedDay.milesCol] || 0);
+            }, 0);
+            
+            try {
+                // Fill basic fields
+                form.getTextField('contractor_agency').setText('Knight Division Tactical');
+                form.getTextField('incident_name').setText(fireName);
+                form.getTextField('date').setText(dateStr);
+                form.getTextField('total_hours').setText(totalPeople.toString());
+                form.getTextField('miles_quantity').setText(totalMiles.toString());
+                form.getTextField('operator_name').setText('KDT');
+                form.getTextField('total').setText(totalPeople.toString());
+                
+                // Check the miles checkbox
+                form.getCheckBox('miles_checkbox').check();
+                
+            } catch (e) {
+                console.warn('Some Shift Ticket fields not found:', e);
+            }
+            
+            const pdfBytes = await pdfDoc.save();
+            const filename = `${fireName}_${userName}_ShiftTicket_${dateStr.replace(/\//g, '-')}.pdf`;
+            downloadPDF(pdfBytes, filename);
         }
         
         function downloadPDF(pdfBytes, filename) {
@@ -1363,8 +1248,13 @@
         }
         
         function showStatus(message, type) {
-            const statusDiv = document.getElementById('statusMessage');
-            statusDiv.innerHTML = `<div class="status ${type}">${message}</div>`;
+            const statusDivs = ['statusMessage', 'userStatusMessage', 'fireSetupStatus'];
+            statusDivs.forEach(id => {
+                const div = document.getElementById(id);
+                if (div) {
+                    div.innerHTML = `<div class="status ${type}">${message}</div>`;
+                }
+            });
         }
     </script>
 </body>
