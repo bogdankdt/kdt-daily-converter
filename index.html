@@ -161,69 +161,6 @@
             box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
         }
         
-        .day-grid {
-            display: grid;
-            grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
-            gap: 15px;
-            margin: 20px 0;
-        }
-        
-        .day-card {
-            background: white;
-            border: 2px solid #dee2e6;
-            border-radius: 8px;
-            padding: 15px;
-            cursor: pointer;
-            transition: all 0.3s ease;
-        }
-        
-        .day-card:hover {
-            border-color: #5a6c57;
-            transform: translateY(-2px);
-        }
-        
-        .day-card.selected {
-            border-color: #28a745;
-            background: #e8f5e8;
-        }
-        
-        .day-header {
-            font-weight: 600;
-            color: #2d4a3e;
-            margin-bottom: 10px;
-        }
-        
-        .day-summary {
-            color: #718096;
-            font-size: 0.9rem;
-        }
-        
-        .employee-preview {
-            background: #f8f9fa;
-            border-radius: 8px;
-            padding: 15px;
-            margin: 15px 0;
-            max-height: 300px;
-            overflow-y: auto;
-        }
-        
-        .employee-row {
-            display: grid;
-            grid-template-columns: 2fr 1fr 1fr 1fr;
-            gap: 10px;
-            padding: 8px;
-            background: white;
-            margin-bottom: 5px;
-            border-radius: 4px;
-            font-size: 0.9rem;
-        }
-        
-        .employee-row.header {
-            background: #5a6c57;
-            color: white;
-            font-weight: 600;
-        }
-        
         input, select, button, textarea {
             width: 100%;
             padding: 15px;
@@ -345,10 +282,6 @@
             .mode-selector {
                 flex-direction: column;
             }
-            
-            .day-grid {
-                grid-template-columns: 1fr;
-            }
         }
     </style>
 </head>
@@ -356,7 +289,7 @@
     <div class="container">
         <div class="header">
             <div class="kdt-logo"></div>
-            <h1>KDT Daily CTR/Shift Ticket Auto-Generator v2.0</h1>
+            <h1>KDT Daily CTR/Shift Ticket Auto-Generator v3.0</h1>
             <p>Automated PDF generation with project management and team collaboration</p>
             
             <div class="mode-selector">
@@ -397,7 +330,7 @@
                         <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 15px;">
                             <h3>Your Projects</h3>
                             <button onclick="createNewProject()" style="width: auto; padding: 10px 20px;">
-                                ➕ Create New Project
+                                Create New Project
                             </button>
                         </div>
                         
@@ -485,17 +418,17 @@
                     </div>
                 </div>
                 
-                <!-- Fire Name Setup -->
-                <div class="step" id="fireNameStep" style="display: none;">
+                <!-- Simple User Workflow -->
+                <div class="step" id="userWorkflow" style="display: none;">
                     <div class="step-title">
-                        <div class="step-number">🔥</div>
-                        Fire Name & Setup
+                        <div class="step-number">📝</div>
+                        Generate PDFs
                     </div>
                     
                     <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 20px; margin-bottom: 20px;">
                         <div>
                             <label style="display: block; font-weight: 600; margin-bottom: 8px;">Fire Name:</label>
-                            <input type="text" id="fireNameInput" placeholder="Enter fire name (e.g., Canyon Fire 2024)">
+                            <input type="text" id="fireNameInput" placeholder="Enter fire name">
                         </div>
                         <div>
                             <label style="display: block; font-weight: 600; margin-bottom: 8px;">Your Name:</label>
@@ -503,102 +436,26 @@
                         </div>
                     </div>
                     
-                    <button onclick="setupFireProject()" class="btn-success">
-                        Create Fire Project
-                    </button>
-                    
-                    <div id="fireSetupStatus"></div>
-                </div>
-                
-                <!-- Fire Project Management Tab -->
-                <div class="step" id="fireProjectsStep" style="display: none;">
-                    <div class="step-title">
-                        <div class="step-number">🗂️</div>
-                        All Fire Projects
-                    </div>
-                    
-                    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px;">
-                        <h4>Active Fire Projects</h4>
-                        <button onclick="refreshFireProjects()" style="width: auto; padding: 10px 20px;">
-                            🔄 Refresh Data
-                        </button>
-                    </div>
-                    
-                    <div id="fireProjectsList" class="project-list">
-                        <!-- Fire projects will be listed here -->
-                    </div>
-                </div>
-                
-                <!-- Day Selection & Preview -->
-                <div class="step" id="daySelectionStep" style="display: none;">
-                    <div class="step-title">
-                        <div class="step-number">📅</div>
-                        Select Day & Generate PDFs
-                    </div>
-                    
-                    <div id="daySelector" class="day-grid">
-                        <!-- Day options will be populated here -->
+                    <div id="daySelector" style="margin: 20px 0;">
+                        <!-- Day selection will appear here -->
                     </div>
                     
                     <div id="selectedDayPreview" style="display: none;">
                         <h4>Selected Day Summary</h4>
-                        <div id="dayEmployeePreview" class="employee-preview">
-                            <!-- Employee data for selected day will be shown here -->
-                        </div>
-                        
-                        <div style="margin: 20px 0; padding: 15px; background: #e8f5e8; border-radius: 8px;">
-                            <h4>PDF Generation Summary</h4>
-                            <div id="pdfSummary"></div>
-                        </div>
-                        
-                        <button onclick="generatePDFs()" id="generateBtn" class="btn-success">
+                        <div id="summaryInfo"></div>
+                        <button onclick="generatePDFs()" id="generateBtn" class="btn-success" style="margin-top: 20px;">
                             Generate & Download PDFs
                         </button>
                     </div>
                     
                     <div id="userStatusMessage"></div>
                 </div>
-                
-                <!-- Selected Fire Project Work Area -->
-                <div class="step" id="selectedFireProject" style="display: none;">
-                    <div class="step-title">
-                        <div class="step-number">📋</div>
-                        Working on: <span id="selectedFireName">Fire Project</span>
-                    </div>
-                    
-                    <div style="margin-bottom: 20px; padding: 15px; background: #f8f9fa; border-radius: 8px;">
-                        <p><strong>Timesheet:</strong> <span id="currentTimesheetPath">Loading...</span></p>
-                        <p><strong>Last Updated:</strong> <span id="lastRefresh">Never</span></p>
-                    </div>
-                    
-                    <div id="fireProjectDaySelector" class="day-grid">
-                        <!-- Day options will be populated here -->
-                    </div>
-                    
-                    <div id="fireProjectPreview" style="display: none;">
-                        <h4>Selected Day Summary</h4>
-                        <div id="fireProjectEmployeePreview" class="employee-preview">
-                            <!-- Employee data for selected day will be shown here -->
-                        </div>
-                        
-                        <div style="margin: 20px 0; padding: 15px; background: #e8f5e8; border-radius: 8px;">
-                            <h4>PDF Generation Summary</h4>
-                            <div id="fireProjectPdfSummary"></div>
-                        </div>
-                        
-                        <button onclick="generateFireProjectPDFs()" id="generateFireBtn" class="btn-success">
-                            Generate & Download PDFs
-                        </button>
-                    </div>
-                    
-                    <div id="fireProjectStatus"></div>
-                </div>
             </div>
         </div>
     </div>
 
     <script>
-        // Global variables
+        // Global variables - declared at the top
         let projects = [];
         let currentProject = null;
         let timesheetData = null;
@@ -613,17 +470,58 @@
         const CLIENT_ID = '366876817577-1va8eaifrnvu76dl15chgvcqlvcc6af0.apps.googleusercontent.com';
         const SCOPES = 'https://www.googleapis.com/auth/spreadsheets https://www.googleapis.com/auth/drive.file';
         
-        // Initialize app
+        // Essential functions that need to be available immediately
+        function switchMode(mode) {
+            console.log('switchMode called:', mode);
+            currentMode = mode;
+            
+            // Update mode buttons
+            document.querySelectorAll('.mode-btn').forEach(btn => btn.classList.remove('active'));
+            event.target.classList.add('active');
+            
+            // Show/hide mode sections
+            document.querySelectorAll('.mode-section').forEach(section => section.classList.remove('active'));
+            document.getElementById(mode + 'Mode').classList.add('active');
+            
+            if (mode === 'user') {
+                loadUserProjects();
+            }
+        }
+        
+        function handleAuthClick() {
+            console.log('handleAuthClick called');
+            if (!isAuthenticated && tokenClient) {
+                showAuthStatus('Requesting Google Drive access...', 'info');
+                tokenClient.requestAccessToken();
+            } else {
+                console.log('Not ready for auth:', { isAuthenticated, tokenClient });
+            }
+        }
+        
+        function showAuthStatus(message, type) {
+            const authStatusEl = document.getElementById('authStatus');
+            if (authStatusEl) {
+                authStatusEl.innerHTML = `<div class="status ${type}" style="margin: 0;">${message}</div>`;
+            }
+        }
+        
+        function showStatus(message, type) {
+            const statusDivs = ['userStatusMessage'];
+            statusDivs.forEach(id => {
+                const div = document.getElementById(id);
+                if (div) {
+                    div.innerHTML = `<div class="status ${type}">${message}</div>`;
+                }
+            });
+        }
+        
+        // Initialize app when page loads
         window.addEventListener('load', function() {
             console.log('Page loaded, initializing...');
-            try {
-                initializeGoogleAPI();
-                setupEventListeners();
-                loadProjects();
-                showStatus('KDT Auto-Generator ready! Connect to Google Drive to start.', 'info');
-            } catch (error) {
-                console.error('Error during initialization:', error);
-            }
+            initializeGoogleAPI();
+            setupEventListeners();
+            loadProjects();
+            showStatus('KDT Auto-Generator ready! Connect to Google Drive to start.', 'info');
         });
         
         function initializeGoogleAPI() {
@@ -632,13 +530,13 @@
             
             const checkGoogle = () => {
                 if (typeof google !== 'undefined' && google.accounts) {
-                    console.log('Google APIs loaded, creating token client...');
+                    console.log('Google APIs loaded');
                     try {
                         tokenClient = google.accounts.oauth2.initTokenClient({
                             client_id: CLIENT_ID,
                             scope: SCOPES,
                             callback: (tokenResponse) => {
-                                console.log('OAuth successful', tokenResponse);
+                                console.log('OAuth successful');
                                 isAuthenticated = true;
                                 accessToken = tokenResponse.access_token;
                                 
@@ -654,7 +552,6 @@
                         showAuthStatus('Error initializing Google APIs.', 'error');
                     }
                 } else {
-                    console.log('Google APIs not ready, retrying...');
                     setTimeout(checkGoogle, 100);
                 }
             };
@@ -664,18 +561,14 @@
         
         function setupEventListeners() {
             console.log('Setting up event listeners...');
-            try {
-                const timesheetFile = document.getElementById('timesheetFile');
-                const pdfFile = document.getElementById('pdfFile');
-                
-                if (timesheetFile) {
-                    timesheetFile.addEventListener('change', handleTimesheetUpload);
-                }
-                if (pdfFile) {
-                    pdfFile.addEventListener('change', handlePDFUpload);
-                }
-            } catch (error) {
-                console.error('Error setting up event listeners:', error);
+            const timesheetFile = document.getElementById('timesheetFile');
+            const pdfFile = document.getElementById('pdfFile');
+            
+            if (timesheetFile) {
+                timesheetFile.addEventListener('change', handleTimesheetUpload);
+            }
+            if (pdfFile) {
+                pdfFile.addEventListener('change', handlePDFUpload);
             }
         }
         
@@ -764,24 +657,39 @@
         }
         
         // Timesheet Processing
-        async function handleTimesheetUpload(event) {
+        function handleTimesheetUpload(event) {
             const file = event.target.files[0];
             if (!file) return;
             
-            try {
-                showStatus('Error processing timesheet: ' + error.message, 'error');
-            }
+            showStatus('Processing timesheet...', 'info');
+            
+            const reader = new FileReader();
+            reader.onload = function(e) {
+                try {
+                    const workbook = XLSX.read(e.target.result, { type: 'array', cellDates: true });
+                    const worksheet = workbook.Sheets[workbook.SheetNames[0]];
+                    const jsonData = XLSX.utils.sheet_to_json(worksheet, { header: 1 });
+                    
+                    timesheetData = processTimesheetData(jsonData);
+                    currentProject.timesheetData = timesheetData;
+                    
+                    displayTimesheetPreview();
+                    document.getElementById('pdfTemplateStep').style.display = 'block';
+                    
+                    showStatus('Timesheet processed successfully!', 'success');
+                } catch (error) {
+                    console.error('Error processing timesheet:', error);
+                    showStatus('Error processing timesheet: ' + error.message, 'error');
+                }
+            };
+            reader.readAsArrayBuffer(file);
         }
         
         function processTimesheetData(jsonData) {
-            // Extract fire name from header
             const fireName = jsonData[0] && jsonData[0][1] ? jsonData[0][1] : 'Unknown Fire';
-            
-            // Extract dates from row 4 (index 3)
             const dateRow = jsonData[3];
             const dates = [];
             
-            // Parse date columns (every 2 columns starting from index 4)
             for (let i = 4; i < dateRow.length; i += 2) {
                 if (dateRow[i] && dateRow[i + 1]) {
                     dates.push({
@@ -793,16 +701,12 @@
                 }
             }
             
-            // Extract employee data - filter out empty rows and section headers
             const employees = [];
-            
             for (let i = 5; i < jsonData.length; i++) {
                 const row = jsonData[i];
                 if (!row || !row[0] || typeof row[0] !== 'string') continue;
                 
                 const name = row[0].trim();
-                
-                // Skip header/total rows and empty names
                 if (!name || 
                     name.toLowerCase().includes('total') || 
                     name.toLowerCase().includes('combined') ||
@@ -813,7 +717,6 @@
                     continue;
                 }
                 
-                // Determine classification based on context
                 let classification = 'Guard';
                 for (let j = i - 1; j >= 0; j--) {
                     const prevRow = jsonData[j];
@@ -832,7 +735,6 @@
                     }
                 }
                 
-                // Only add if there's actual data (at least one worked hour)
                 let hasData = false;
                 for (let col = 4; col < row.length; col += 2) {
                     if (row[col] && row[col] > 0) {
@@ -862,45 +764,26 @@
             if (!timesheetData) return;
             
             const preview = document.getElementById('timesheetPreview');
+            const counts = { Guard: 0, Manager: 0, Supervisor: 0 };
+            timesheetData.employees.forEach(emp => {
+                counts[emp.classification]++;
+            });
+            
             let html = `
                 <div style="background: #f8f9fa; padding: 20px; border-radius: 8px; margin: 20px 0;">
                     <h4>Timesheet Preview</h4>
                     <p><strong>Fire Name:</strong> ${timesheetData.fireName}</p>
                     <p><strong>Dates Available:</strong> ${timesheetData.dates.length} days</p>
                     <p><strong>Employees:</strong> ${timesheetData.employees.length} total</p>
-                    
                     <div style="margin-top: 15px;">
                         <strong>Employee Breakdown:</strong><br>
             `;
-            
-            const counts = { Guard: 0, Manager: 0, Supervisor: 0 };
-            timesheetData.employees.forEach(emp => {
-                counts[emp.classification]++;
-            });
             
             Object.entries(counts).forEach(([type, count]) => {
                 if (count > 0) {
                     html += `${type}s: ${count} &nbsp;&nbsp;`;
                 }
             });
-            
-            html += `
-                    </div>
-                    
-                    <div style="margin-top: 15px;">
-                        <strong>Available Dates:</strong><br>
-            `;
-            
-            timesheetData.dates.slice(0, 5).forEach(dateInfo => {
-                const dateStr = dateInfo.date instanceof Date ? 
-                    dateInfo.date.toLocaleDateString() : 
-                    new Date(dateInfo.date).toLocaleDateString();
-                html += `${dateInfo.dayName} ${dateStr} &nbsp;&nbsp;`;
-            });
-            
-            if (timesheetData.dates.length > 5) {
-                html += `... and ${timesheetData.dates.length - 5} more`;
-            }
             
             html += '</div></div>';
             preview.innerHTML = html;
@@ -953,7 +836,6 @@
             displayPDFPreview();
         }
         
-        // Helper functions for user mode
         function base64ToFile(base64, filename) {
             const byteCharacters = atob(base64);
             const byteNumbers = new Array(byteCharacters.length);
@@ -964,7 +846,7 @@
             return new File([byteArray], filename, { type: 'application/pdf' });
         }
         
-        async function saveProject() {
+        function saveProject() {
             const projectName = document.getElementById('projectNameInput').value.trim();
             const baseFolder = document.getElementById('baseFolderInput').value.trim();
             
@@ -983,21 +865,26 @@
                 return;
             }
             
-            try {
-                showStatus('Saving project...', 'info');
-                
-                // Store PDF template data as base64 for persistence
-                const templateData = [];
-                for (const template of pdfTemplates) {
-                    const arrayBuffer = await template.file.arrayBuffer();
-                    const base64 = btoa(String.fromCharCode(...new Uint8Array(arrayBuffer)));
-                    templateData.push({
-                        name: template.name,
-                        type: template.type,
-                        data: base64
-                    });
-                }
-                
+            showStatus('Saving project...', 'info');
+            
+            // Store PDF template data as base64 for persistence
+            const templatePromises = pdfTemplates.map(template => {
+                return new Promise((resolve) => {
+                    const reader = new FileReader();
+                    reader.onload = function(e) {
+                        const arrayBuffer = e.target.result;
+                        const base64 = btoa(String.fromCharCode(...new Uint8Array(arrayBuffer)));
+                        resolve({
+                            name: template.name,
+                            type: template.type,
+                            data: base64
+                        });
+                    };
+                    reader.readAsArrayBuffer(template.file);
+                });
+            });
+            
+            Promise.all(templatePromises).then(templateData => {
                 currentProject.name = projectName;
                 currentProject.baseFolder = baseFolder;
                 currentProject.pdfTemplateData = templateData;
@@ -1015,11 +902,10 @@
                 
                 showStatus(`Project "${projectName}" saved successfully!`, 'success');
                 alert(`Project "${projectName}" has been saved successfully!`);
-                
-            } catch (error) {
+            }).catch(error => {
                 console.error('Error saving project:', error);
                 showStatus('Error saving project: ' + error.message, 'error');
-            }
+            });
         }
         
         // User Mode Functions
@@ -1064,15 +950,16 @@
                 pdfTemplates = [];
             }
             
-            document.getElementById('fireNameStep').style.display = 'block';
+            document.getElementById('userWorkflow').style.display = 'block';
+            displayUserDaySelector();
             showStatus(`Selected project: ${currentProject.name}`, 'success');
         }
         
-        function displayDaySelector() {
+        function displayUserDaySelector() {
             if (!timesheetData || !timesheetData.dates) return;
             
             const container = document.getElementById('daySelector');
-            let html = '';
+            let html = '<h4>Select a day to process:</h4><div style="display: grid; grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); gap: 15px; margin: 20px 0;">';
             
             timesheetData.dates.forEach((dateInfo, index) => {
                 const dateStr = dateInfo.date instanceof Date ? 
@@ -1082,9 +969,10 @@
                 const daySummary = calculateDaySummary(dateInfo);
                 
                 html += `
-                    <div class="day-card" onclick="selectDay(${index})">
-                        <div class="day-header">${dateInfo.dayName} ${dateStr}</div>
-                        <div class="day-summary">
+                    <div style="background: white; border: 2px solid #dee2e6; border-radius: 8px; padding: 15px; cursor: pointer; transition: all 0.3s ease;" 
+                         onclick="selectDay(${index})" id="dayCard${index}">
+                        <div style="font-weight: 600; color: #2d4a3e; margin-bottom: 10px;">${dateInfo.dayName} ${dateStr}</div>
+                        <div style="color: #718096; font-size: 0.9rem;">
                             People: ${daySummary.totalPeople}<br>
                             Miles: ${daySummary.totalMiles}
                         </div>
@@ -1092,6 +980,7 @@
                 `;
             });
             
+            html += '</div>';
             container.innerHTML = html;
         }
         
@@ -1115,8 +1004,15 @@
         function selectDay(index) {
             selectedDay = timesheetData.dates[index];
             
-            document.querySelectorAll('#daySelector .day-card').forEach(card => card.classList.remove('selected'));
-            event.target.closest('.day-card').classList.add('selected');
+            // Update visual selection
+            document.querySelectorAll('[id^="dayCard"]').forEach(card => {
+                card.style.borderColor = '#dee2e6';
+                card.style.background = 'white';
+            });
+            
+            const selectedCard = document.getElementById(`dayCard${index}`);
+            selectedCard.style.borderColor = '#28a745';
+            selectedCard.style.background = '#e8f5e8';
             
             displaySelectedDayPreview();
             document.getElementById('selectedDayPreview').style.display = 'block';
@@ -1144,44 +1040,28 @@
                 }
             });
             
-            let html = `
-                <div class="employee-row header">
-                    <div>Name</div>
-                    <div>Classification</div>
-                    <div>Hours</div>
-                    <div>Miles</div>
-                </div>
-            `;
-            
-            dayEmployees.forEach(emp => {
-                html += `
-                    <div class="employee-row">
-                        <div>${emp.name}</div>
-                        <div>${emp.classification}</div>
-                        <div>${emp.worked}</div>
-                        <div>${emp.miles}</div>
-                    </div>
-                `;
-            });
-            
-            document.getElementById('dayEmployeePreview').innerHTML = html;
-            
             const totalPeople = dayEmployees.length;
             const totalMiles = dayEmployees.reduce((sum, emp) => sum + emp.miles, 0);
             
             const summaryHtml = `
-                <p><strong>Date:</strong> ${selectedDay.dayName} ${dateStr}</p>
-                <p><strong>Total People Worked:</strong> ${totalPeople} days</p>
-                <p><strong>Total Miles:</strong> ${totalMiles}</p>
-                <p><strong>Fire Name:</strong> ${document.getElementById('fireNameInput').value}</p>
-                <p><strong>Contractor/Agency:</strong> Knight Division Tactical</p>
-                <p><strong>Operator:</strong> KDT</p>
+                <div style="background: #f8f9fa; padding: 15px; border-radius: 8px; margin: 15px 0;">
+                    <p><strong>Date:</strong> ${selectedDay.dayName} ${dateStr}</p>
+                    <p><strong>Total People Worked:</strong> ${totalPeople} days</p>
+                    <p><strong>Total Miles:</strong> ${totalMiles}</p>
+                    <p><strong>Contractor/Agency:</strong> Knight Division Tactical</p>
+                    <p><strong>Operator:</strong> KDT</p>
+                </div>
             `;
             
-            document.getElementById('pdfSummary').innerHTML = summaryHtml;
+            document.getElementById('summaryInfo').innerHTML = summaryHtml;
         }
         
-        async function setupFireProject() {
+        function generatePDFs() {
+            if (!selectedDay) {
+                showStatus('Please select a day first.', 'error');
+                return;
+            }
+            
             const fireName = document.getElementById('fireNameInput').value.trim();
             const userName = document.getElementById('userNameInput').value.trim();
             
@@ -1190,369 +1070,160 @@
                 return;
             }
             
-            const fireProject = {
-                fireName: fireName,
-                userName: userName,
-                projectName: currentProject.name,
-                created: new Date().toISOString()
-            };
+            showStatus('Generating PDFs...', 'info');
             
-            let fireProjects = JSON.parse(localStorage.getItem('fireProjects') || '[]');
-            fireProjects.push(fireProject);
-            localStorage.setItem('fireProjects', JSON.stringify(fireProjects));
-            
-            document.getElementById('daySelectionStep').style.display = 'block';
-            document.getElementById('fireProjectsStep').style.display = 'block';
-            displayDaySelector();
-            loadFireProjects();
-            
-            showStatus(`Fire project "${fireName}" set up for ${userName}!`, 'success');
-        }
-        
-        function loadFireProjects() {
-            const fireProjects = JSON.parse(localStorage.getItem('fireProjects') || '[]');
-            const container = document.getElementById('fireProjectsList');
-            
-            if (fireProjects.length === 0) {
-                container.innerHTML = '<p style="color: #718096; text-align: center; padding: 40px;">No fire projects created yet.</p>';
-                return;
-            }
-            
-            let html = '';
-            fireProjects.forEach((fireProject, index) => {
-                html += `
-                    <div class="project-card" onclick="selectFireProject(${index})">
-                        <h4>${fireProject.fireName}</h4>
-                        <p style="color: #718096; margin: 10px 0;">
-                            Created by: ${fireProject.userName}
-                        </p>
-                        <p style="color: #718096;">
-                            Base Project: ${fireProject.projectName}
-                        </p>
-                        <p style="color: #718096; font-size: 0.8rem;">
-                            Created: ${new Date(fireProject.created).toLocaleDateString()}
-                        </p>
-                    </div>
-                `;
-            });
-            
-            container.innerHTML = html;
-        }
-        
-        function selectFireProject(index) {
-            const fireProjects = JSON.parse(localStorage.getItem('fireProjects') || '[]');
-            const selectedFireProject = fireProjects[index];
-            
-            const baseProject = projects.find(p => p.name === selectedFireProject.projectName);
-            if (!baseProject) {
-                showStatus('Base project not found!', 'error');
-                return;
-            }
-            
-            currentProject = baseProject;
-            timesheetData = baseProject.timesheetData;
-            
-            if (baseProject.pdfTemplateData) {
-                pdfTemplates = baseProject.pdfTemplateData.map(templateData => ({
-                    name: templateData.name,
-                    type: templateData.type,
-                    file: base64ToFile(templateData.data, templateData.name)
-                }));
-            }
-            
-            document.getElementById('selectedFireProject').style.display = 'block';
-            document.getElementById('selectedFireName').textContent = selectedFireProject.fireName;
-            
-            displayFireProjectDays();
-        }
-        
-        function displayFireProjectDays() {
-            if (!timesheetData || !timesheetData.dates) return;
-            
-            const container = document.getElementById('fireProjectDaySelector');
-            let html = '';
-            
-            timesheetData.dates.forEach((dateInfo, index) => {
-                const dateStr = dateInfo.date instanceof Date ? 
-                    dateInfo.date.toLocaleDateString() : 
-                    new Date(dateInfo.date).toLocaleDateString();
-                
-                const daySummary = calculateDaySummary(dateInfo);
-                
-                html += `
-                    <div class="day-card" onclick="selectFireProjectDay(${index})">
-                        <div class="day-header">${dateInfo.dayName} ${dateStr}</div>
-                        <div class="day-summary">
-                            People: ${daySummary.totalPeople}<br>
-                            Miles: ${daySummary.totalMiles}
-                        </div>
-                    </div>
-                `;
-            });
-            
-            container.innerHTML = html;
-        }
-        
-        function selectFireProjectDay(index) {
-            selectedDay = timesheetData.dates[index];
-            
-            document.querySelectorAll('#fireProjectDaySelector .day-card').forEach(card => card.classList.remove('selected'));
-            event.target.closest('.day-card').classList.add('selected');
-            
-            displayFireProjectPreview();
-            document.getElementById('fireProjectPreview').style.display = 'block';
-        }
-        
-        function displayFireProjectPreview() {
-            if (!selectedDay) return;
-            
-            const dateStr = selectedDay.date instanceof Date ? 
-                selectedDay.date.toLocaleDateString() : 
-                new Date(selectedDay.date).toLocaleDateString();
-            
-            const dayEmployees = [];
-            timesheetData.employees.forEach(emp => {
-                const worked = emp.rowData[selectedDay.workedCol];
-                const miles = emp.rowData[selectedDay.milesCol] || 0;
-                
-                if (worked >= 8 && worked <= 16) {
-                    dayEmployees.push({
-                        name: emp.name,
-                        classification: emp.classification,
-                        worked: worked,
-                        miles: miles
-                    });
-                }
-            });
-            
-            let html = `
-                <div class="employee-row header">
-                    <div>Name</div>
-                    <div>Classification</div>
-                    <div>Hours</div>
-                    <div>Miles</div>
-                </div>
-            `;
-            
-            dayEmployees.forEach(emp => {
-                html += `
-                    <div class="employee-row">
-                        <div>${emp.name}</div>
-                        <div>${emp.classification}</div>
-                        <div>${emp.worked}</div>
-                        <div>${emp.miles}</div>
-                    </div>
-                `;
-            });
-            
-            document.getElementById('fireProjectEmployeePreview').innerHTML = html;
-            
-            const totalPeople = dayEmployees.length;
-            const totalMiles = dayEmployees.reduce((sum, emp) => sum + emp.miles, 0);
-            
-            const fireName = document.getElementById('selectedFireName').textContent;
-            const summaryHtml = `
-                <p><strong>Date:</strong> ${selectedDay.dayName} ${dateStr}</p>
-                <p><strong>Total People Worked:</strong> ${totalPeople} days</p>
-                <p><strong>Total Miles:</strong> ${totalMiles}</p>
-                <p><strong>Fire Name:</strong> ${fireName}</p>
-                <p><strong>Contractor/Agency:</strong> Knight Division Tactical</p>
-                <p><strong>Operator:</strong> KDT</p>
-            `;
-            
-            document.getElementById('fireProjectPdfSummary').innerHTML = summaryHtml;
-        }
-        
-        function refreshFireProjects() {
-            showStatus('Refreshing fire project data...', 'info');
-            
-            setTimeout(() => {
-                document.getElementById('lastRefresh').textContent = new Date().toLocaleString();
-                displayFireProjectDays();
-                showStatus('Fire project data refreshed!', 'success');
-            }, 1000);
-        }
-        
-        async function generatePDFs() {
-            if (!selectedDay) {
-                showStatus('Please select a day first.', 'error');
-                return;
-            }
-            
-            try {
-                showStatus('Generating PDFs...', 'info');
-                
-                const fireName = document.getElementById('fireNameInput').value;
-                const userName = document.getElementById('userNameInput').value;
-                
-                const ctrTemplate = pdfTemplates.find(t => t.type === 'ctr');
-                if (ctrTemplate) {
-                    await generateCTRPDF(fireName, userName);
-                }
-                
-                const shiftTemplate = pdfTemplates.find(t => t.type === 'shift');
-                if (shiftTemplate) {
-                    await generateShiftTicketPDF(fireName, userName);
-                }
-                
+            Promise.all([
+                generateCTRPDF(fireName, userName),
+                generateShiftTicketPDF(fireName, userName)
+            ]).then(() => {
                 showStatus('PDFs generated and downloaded successfully!', 'success');
-                
-            } catch (error) {
+            }).catch(error => {
                 console.error('Error generating PDFs:', error);
                 showStatus('Error generating PDFs: ' + error.message, 'error');
-            }
+            });
         }
         
-        async function generateFireProjectPDFs() {
-            if (!selectedDay) {
-                showStatus('Please select a day first.', 'error');
-                return;
-            }
-            
-            try {
-                showStatus('Generating PDFs...', 'info');
-                
-                const fireName = document.getElementById('selectedFireName').textContent;
-                const userName = 'KDT';
-                
+        function generateCTRPDF(fireName, userName) {
+            return new Promise((resolve, reject) => {
                 const ctrTemplate = pdfTemplates.find(t => t.type === 'ctr');
-                if (ctrTemplate) {
-                    await generateCTRPDF(fireName, userName);
+                if (!ctrTemplate) {
+                    reject(new Error('CTR template not found'));
+                    return;
                 }
                 
-                const shiftTemplate = pdfTemplates.find(t => t.type === 'shift');
-                if (shiftTemplate) {
-                    await generateShiftTicketPDF(fireName, userName);
-                }
-                
-                showStatus('PDFs generated and downloaded successfully!', 'success');
-                
-            } catch (error) {
-                console.error('Error generating PDFs:', error);
-                showStatus('Error generating PDFs: ' + error.message, 'error');
-            }
-        }
-        
-        async function generateCTRPDF(fireName, userName) {
-            const ctrTemplate = pdfTemplates.find(t => t.type === 'ctr');
-            if (!ctrTemplate || !ctrTemplate.file) {
-                throw new Error('CTR template not found');
-            }
-            
-            const arrayBuffer = await ctrTemplate.file.arrayBuffer();
-            const pdfDoc = await PDFLib.PDFDocument.load(arrayBuffer);
-            const form = pdfDoc.getForm();
-            const fields = form.getFields();
-            
-            const dateStr = selectedDay.date instanceof Date ? 
-                selectedDay.date.toLocaleDateString() : 
-                new Date(selectedDay.date).toLocaleDateString();
-            
-            const dayEmployees = timesheetData.employees.filter(emp => {
-                const worked = emp.rowData[selectedDay.workedCol];
-                return worked >= 8 && worked <= 16;
-            });
-            
-            // Try to fill basic fields
-            fields.forEach(field => {
-                const fieldName = field.getName().toLowerCase();
-                
-                try {
-                    if (fieldName.includes('crew') || fieldName.includes('agency')) {
-                        field.setText('Knight Division Tactical');
-                    } else if (fieldName.includes('fire') || fieldName.includes('incident')) {
-                        field.setText(fireName);
-                    } else if (fieldName.includes('date')) {
-                        field.setText(dateStr);
-                    }
-                } catch (e) {
-                    console.warn(`Could not fill field ${field.getName()}`);
-                }
-            });
-            
-            // Fill employee data
-            dayEmployees.forEach((emp, index) => {
-                fields.forEach(field => {
-                    const fieldName = field.getName().toLowerCase();
-                    
+                const reader = new FileReader();
+                reader.onload = async function(e) {
                     try {
-                        if (fieldName.includes(`${index + 1}`) || fieldName.includes(`_${index + 1}`)) {
-                            if (fieldName.includes('name')) {
-                                field.setText(emp.name);
-                            } else if (fieldName.includes('class')) {
-                                field.setText(emp.classification);
-                            } else if (fieldName.includes('date')) {
-                                field.setText(dateStr);
+                        const pdfDoc = await PDFLib.PDFDocument.load(e.target.result);
+                        const form = pdfDoc.getForm();
+                        const fields = form.getFields();
+                        
+                        const dateStr = selectedDay.date instanceof Date ? 
+                            selectedDay.date.toLocaleDateString() : 
+                            new Date(selectedDay.date).toLocaleDateString();
+                        
+                        const dayEmployees = timesheetData.employees.filter(emp => {
+                            const worked = emp.rowData[selectedDay.workedCol];
+                            return worked >= 8 && worked <= 16;
+                        });
+                        
+                        // Fill basic fields
+                        fields.forEach(field => {
+                            const fieldName = field.getName().toLowerCase();
+                            
+                            try {
+                                if (fieldName.includes('crew') || fieldName.includes('agency')) {
+                                    field.setText('Knight Division Tactical');
+                                } else if (fieldName.includes('fire') || fieldName.includes('incident')) {
+                                    field.setText(fireName);
+                                } else if (fieldName.includes('date')) {
+                                    field.setText(dateStr);
+                                }
+                            } catch (e) {
+                                console.warn(`Could not fill field ${field.getName()}`);
                             }
-                        }
-                    } catch (e) {
-                        console.warn(`Could not fill employee field ${field.getName()}`);
+                        });
+                        
+                        // Fill employee data
+                        dayEmployees.forEach((emp, index) => {
+                            fields.forEach(field => {
+                                const fieldName = field.getName().toLowerCase();
+                                
+                                try {
+                                    if (fieldName.includes(`${index + 1}`) || fieldName.includes(`_${index + 1}`)) {
+                                        if (fieldName.includes('name')) {
+                                            field.setText(emp.name);
+                                        } else if (fieldName.includes('class')) {
+                                            field.setText(emp.classification);
+                                        } else if (fieldName.includes('date')) {
+                                            field.setText(dateStr);
+                                        }
+                                    }
+                                } catch (e) {
+                                    console.warn(`Could not fill employee field ${field.getName()}`);
+                                }
+                            });
+                        });
+                        
+                        const pdfBytes = await pdfDoc.save();
+                        const filename = `${fireName}_${userName}_CTR_${dateStr.replace(/\//g, '-')}.pdf`;
+                        downloadPDF(pdfBytes, filename);
+                        resolve();
+                    } catch (error) {
+                        reject(error);
                     }
-                });
+                };
+                reader.readAsArrayBuffer(ctrTemplate.file);
             });
-            
-            const pdfBytes = await pdfDoc.save();
-            const filename = `${fireName}_${userName}_CTR_${dateStr.replace(/\//g, '-')}.pdf`;
-            downloadPDF(pdfBytes, filename);
         }
         
-        async function generateShiftTicketPDF(fireName, userName) {
-            const shiftTemplate = pdfTemplates.find(t => t.type === 'shift');
-            if (!shiftTemplate || !shiftTemplate.file) {
-                throw new Error('Shift Ticket template not found');
-            }
-            
-            const arrayBuffer = await shiftTemplate.file.arrayBuffer();
-            const pdfDoc = await PDFLib.PDFDocument.load(arrayBuffer);
-            const form = pdfDoc.getForm();
-            const fields = form.getFields();
-            
-            const dateStr = selectedDay.date instanceof Date ? 
-                selectedDay.date.toLocaleDateString() : 
-                new Date(selectedDay.date).toLocaleDateString();
-            
-            const dayEmployees = timesheetData.employees.filter(emp => {
-                const worked = emp.rowData[selectedDay.workedCol];
-                return worked >= 8 && worked <= 16;
-            });
-            
-            const totalPeople = dayEmployees.length;
-            const totalMiles = dayEmployees.reduce((sum, emp) => {
-                return sum + (emp.rowData[selectedDay.milesCol] || 0);
-            }, 0);
-            
-            fields.forEach(field => {
-                const fieldName = field.getName().toLowerCase();
-                
-                try {
-                    if (fieldName.includes('contractor') || fieldName.includes('agency')) {
-                        field.setText('Knight Division Tactical');
-                    } else if (fieldName.includes('incident') || fieldName.includes('fire')) {
-                        field.setText(fireName);
-                    } else if (fieldName.includes('date')) {
-                        field.setText(dateStr);
-                    } else if (fieldName.includes('total') && fieldName.includes('hour')) {
-                        field.setText(totalPeople.toString());
-                    } else if (fieldName.includes('miles') && fieldName.includes('quantity')) {
-                        field.setText(totalMiles.toString());
-                    } else if (fieldName.includes('operator')) {
-                        field.setText('KDT');
-                    } else if (fieldName.includes('total') && !fieldName.includes('hour')) {
-                        field.setText(totalPeople.toString());
-                    }
-                    
-                    // Check miles checkbox
-                    if (fieldName.includes('miles') && field.constructor.name === 'PDFCheckBox') {
-                        field.check();
-                    }
-                } catch (e) {
-                    console.warn(`Could not fill field ${field.getName()}`);
+        function generateShiftTicketPDF(fireName, userName) {
+            return new Promise((resolve, reject) => {
+                const shiftTemplate = pdfTemplates.find(t => t.type === 'shift');
+                if (!shiftTemplate) {
+                    reject(new Error('Shift Ticket template not found'));
+                    return;
                 }
+                
+                const reader = new FileReader();
+                reader.onload = async function(e) {
+                    try {
+                        const pdfDoc = await PDFLib.PDFDocument.load(e.target.result);
+                        const form = pdfDoc.getForm();
+                        const fields = form.getFields();
+                        
+                        const dateStr = selectedDay.date instanceof Date ? 
+                            selectedDay.date.toLocaleDateString() : 
+                            new Date(selectedDay.date).toLocaleDateString();
+                        
+                        const dayEmployees = timesheetData.employees.filter(emp => {
+                            const worked = emp.rowData[selectedDay.workedCol];
+                            return worked >= 8 && worked <= 16;
+                        });
+                        
+                        const totalPeople = dayEmployees.length;
+                        const totalMiles = dayEmployees.reduce((sum, emp) => {
+                            return sum + (emp.rowData[selectedDay.milesCol] || 0);
+                        }, 0);
+                        
+                        fields.forEach(field => {
+                            const fieldName = field.getName().toLowerCase();
+                            
+                            try {
+                                if (fieldName.includes('contractor') || fieldName.includes('agency')) {
+                                    field.setText('Knight Division Tactical');
+                                } else if (fieldName.includes('incident') || fieldName.includes('fire')) {
+                                    field.setText(fireName);
+                                } else if (fieldName.includes('date')) {
+                                    field.setText(dateStr);
+                                } else if (fieldName.includes('total') && fieldName.includes('hour')) {
+                                    field.setText(totalPeople.toString());
+                                } else if (fieldName.includes('miles') && fieldName.includes('quantity')) {
+                                    field.setText(totalMiles.toString());
+                                } else if (fieldName.includes('operator')) {
+                                    field.setText('KDT');
+                                } else if (fieldName.includes('total') && !fieldName.includes('hour')) {
+                                    field.setText(totalPeople.toString());
+                                }
+                                
+                                if (fieldName.includes('miles') && field.constructor.name === 'PDFCheckBox') {
+                                    field.check();
+                                }
+                            } catch (e) {
+                                console.warn(`Could not fill field ${field.getName()}`);
+                            }
+                        });
+                        
+                        const pdfBytes = await pdfDoc.save();
+                        const filename = `${fireName}_${userName}_ShiftTicket_${dateStr.replace(/\//g, '-')}.pdf`;
+                        downloadPDF(pdfBytes, filename);
+                        resolve();
+                    } catch (error) {
+                        reject(error);
+                    }
+                };
+                reader.readAsArrayBuffer(shiftTemplate.file);
             });
-            
-            const pdfBytes = await pdfDoc.save();
-            const filename = `${fireName}_${userName}_ShiftTicket_${dateStr.replace(/\//g, '-')}.pdf`;
-            downloadPDF(pdfBytes, filename);
         }
         
         function downloadPDF(pdfBytes, filename) {
@@ -1566,34 +1237,6 @@
             document.body.removeChild(a);
             URL.revokeObjectURL(url);
         }
-        
-        function showStatus(message, type) {
-            const statusDivs = ['statusMessage', 'userStatusMessage', 'fireSetupStatus', 'fireProjectStatus'];
-            statusDivs.forEach(id => {
-                const div = document.getElementById(id);
-                if (div) {
-                    div.innerHTML = `<div class="status ${type}">${message}</div>`;
-                }
-            });
-        }
     </script>
 </body>
-</html>Processing timesheet...', 'info');
-                
-                const arrayBuffer = await file.arrayBuffer();
-                const workbook = XLSX.read(arrayBuffer, { cellDates: true });
-                const worksheet = workbook.Sheets[workbook.SheetNames[0]];
-                const jsonData = XLSX.utils.sheet_to_json(worksheet, { header: 1 });
-                
-                // Process the timesheet data
-                timesheetData = processTimesheetData(jsonData);
-                currentProject.timesheetData = timesheetData;
-                
-                displayTimesheetPreview();
-                document.getElementById('pdfTemplateStep').style.display = 'block';
-                
-                showStatus('Timesheet processed successfully!', 'success');
-                
-            } catch (error) {
-                console.error('Error processing timesheet:', error);
-                showStatus('
+</html>
