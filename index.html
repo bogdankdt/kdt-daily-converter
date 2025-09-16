@@ -5,6 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>KDT Daily CTR/Shift Ticket Auto-Generator</title>
     <script src="https://accounts.google.com/gsi/client"></script>
+    <script src="https://apis.google.com/js/api.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf-lib/1.17.1/pdf-lib.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
     <style>
@@ -442,14 +443,14 @@
                 <div class="step">
                     <div class="step-title">
                         <div class="step-number">📁</div>
-                        Project Management
+                        Project Template Management
                     </div>
                     
                     <div class="project-panel">
                         <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 15px;">
-                            <h3>Your Projects</h3>
+                            <h3>Your Project Templates</h3>
                             <button onclick="createNewProject()" style="width: auto; padding: 10px 20px;">
-                                Create New Project
+                                Create New Template
                             </button>
                         </div>
                         
@@ -463,17 +464,17 @@
                 <div class="step" id="projectSetupStep" style="display: none;">
                     <div class="step-title">
                         <div class="step-number">⚙️</div>
-                        Project Setup: <span id="currentProjectName">New Project</span>
+                        Template Setup: <span id="currentProjectName">New Template</span>
                     </div>
                     
                     <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 20px; margin-bottom: 20px;">
                         <div>
-                            <label style="display: block; font-weight: 600; margin-bottom: 8px;">Project Name:</label>
-                            <input type="text" id="projectNameInput" placeholder="Enter project name">
+                            <label style="display: block; font-weight: 600; margin-bottom: 8px;">Template Name:</label>
+                            <input type="text" id="projectNameInput" placeholder="Enter template name">
                         </div>
                         <div>
-                            <label style="display: block; font-weight: 600; margin-bottom: 8px;">Base Folder (Google Drive):</label>
-                            <input type="text" id="baseFolderInput" placeholder="Enter base folder name">
+                            <label style="display: block; font-weight: 600; margin-bottom: 8px;">Company/Division:</label>
+                            <input type="text" id="baseFolderInput" placeholder="Enter company name">
                         </div>
                     </div>
                     
@@ -517,7 +518,7 @@
                     
                     <div style="margin-top: 20px;">
                         <button onclick="saveProject()" class="btn-success">
-                            Save Project
+                            Save Template & Create Folders
                         </button>
                         <button onclick="cancelEdit()" class="btn-warning" style="margin-left: 10px;">
                             Cancel
@@ -532,7 +533,13 @@
                 <div class="step">
                     <div class="step-title">
                         <div class="step-number">🎯</div>
-                        Select Project
+                        Select Template or Active Project
+                    </div>
+                    
+                    <div style="margin-bottom: 20px;">
+                        <button onclick="refreshUserProjects()" class="btn-info" style="width: auto; padding: 10px 20px; margin-bottom: 15px;">
+                            🔄 Refresh Projects
+                        </button>
                     </div>
                     
                     <div id="userProjectList" class="project-list">
@@ -540,11 +547,45 @@
                     </div>
                 </div>
                 
+                <!-- Create New Project from Template -->
+                <div class="step" id="createProjectStep" style="display: none;">
+                    <div class="step-title">
+                        <div class="step-number">🔥</div>
+                        Create New Fire Project
+                    </div>
+                    
+                    <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 20px; margin-bottom: 20px;">
+                        <div>
+                            <label style="display: block; font-weight: 600; margin-bottom: 8px;">Fire/Incident Name:</label>
+                            <input type="text" id="newProjectName" placeholder="Enter fire name (e.g., Bear Fire 2024)">
+                        </div>
+                        <div>
+                            <label style="display: block; font-weight: 600; margin-bottom: 8px;">Your Name:</label>
+                            <input type="text" id="projectCreatorName" placeholder="Enter your name">
+                        </div>
+                    </div>
+                    
+                    <div style="margin-top: 20px;">
+                        <button onclick="createUserProject()" class="btn-success">
+                            Create Project & Folders
+                        </button>
+                        <button onclick="cancelProjectCreation()" class="btn-warning" style="margin-left: 10px;">
+                            Cancel
+                        </button>
+                    </div>
+                </div>
+                
                 <!-- Simple User Workflow -->
                 <div class="step" id="userWorkflow" style="display: none;">
                     <div class="step-title">
-                        <div class="step-number">📝</div>
-                        Generate PDFs
+                        <div class="step-number">📄</div>
+                        Generate PDFs: <span id="currentFireName">Fire Name</span>
+                    </div>
+                    
+                    <div style="margin-bottom: 20px;">
+                        <button onclick="refreshProjectData()" class="btn-info" style="width: auto; padding: 10px 20px;">
+                            🔄 Refresh Data from Google Sheets
+                        </button>
                     </div>
                     
                     <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 20px; margin-bottom: 20px;">
@@ -592,6 +633,7 @@
         // Global variables - declared at the top
         let projects = [];
         let currentProject = null;
+        let selectedTemplate = null;
         let timesheetData = null;
         let pdfTemplates = [];
         let selectedDay = null;
@@ -599,10 +641,11 @@
         let accessToken = null;
         let tokenClient;
         let currentMode = 'admin';
+        let gapiLoaded = false;
         
-        // Google API configuration
+        // Google API configuration - UPDATED SCOPE
         const CLIENT_ID = '366876817577-1va8eaifrnvu76dl15chgvcqlvcc6af0.apps.googleusercontent.com';
-        const SCOPES = 'https://www.googleapis.com/auth/spreadsheets https://www.googleapis.com/auth/drive.file';
+        const SCOPES = 'https://www.googleapis.com/auth/spreadsheets https://www.googleapis.com/auth/drive';
         
         // Initialize app when page loads
         window.addEventListener('load', function() {
@@ -617,9 +660,16 @@
             console.log('Initializing Google API...');
             showAuthStatus('Loading Google APIs...', 'info');
             
+            // Load the Google API client
+            if (typeof gapi !== 'undefined') {
+                gapi.load('client', initializeGapiClient);
+            } else {
+                setTimeout(initializeGoogleAPI, 500);
+            }
+            
             // Use a different approach to check for Google API availability
             if (typeof google !== 'undefined' && google.accounts) {
-                console.log('Google APIs loaded');
+                console.log('Google OAuth APIs loaded');
                 try {
                     tokenClient = google.accounts.oauth2.initTokenClient({
                         client_id: CLIENT_ID,
@@ -629,7 +679,12 @@
                             isAuthenticated = true;
                             accessToken = tokenResponse.access_token;
                             
-                            document.getElementById('authorizeBtn').innerHTML = 'Connected to Google Drive';
+                            // Set the access token for gapi
+                            if (gapiLoaded) {
+                                gapi.client.setToken({access_token: accessToken});
+                            }
+                            
+                            document.getElementById('authorizeBtn').innerHTML = '✅ Connected to Google Drive';
                             document.getElementById('authorizeBtn').disabled = true;
                             showAuthStatus('Successfully connected to Google Drive!', 'success');
                         },
@@ -643,6 +698,21 @@
             } else {
                 // If Google API isn't available yet, try again after a delay
                 setTimeout(initializeGoogleAPI, 500);
+            }
+        }
+        
+        async function initializeGapiClient() {
+            try {
+                await gapi.client.init({
+                    discoveryDocs: [
+                        'https://www.googleapis.com/discovery/v1/apis/drive/v3/rest',
+                        'https://sheets.googleapis.com/$discovery/rest?version=v4'
+                    ]
+                });
+                gapiLoaded = true;
+                console.log('GAPI client initialized');
+            } catch (error) {
+                console.error('Error initializing GAPI client:', error);
             }
         }
         
@@ -714,897 +784,96 @@
             });
         }
         
-        // Project Management Functions
-        function loadProjects() {
+        // NEW: Google Drive folder creation functions
+        async function createProjectFolders(projectName, baseFolder) {
+            if (!isAuthenticated || !gapiLoaded) {
+                throw new Error('Not authenticated with Google Drive');
+            }
+            
             try {
-                const savedProjects = localStorage.getItem('kdtProjects');
-                projects = savedProjects ? JSON.parse(savedProjects) : [];
-                renderProjectList();
+                // Create main KDT folder structure
+                const kdtTemplatesFolder = await createFolder('KDT_Company_Templates', null);
+                const kdtActiveFolder = await createFolder('KDT_Active_Projects', null);
+                
+                // Create template folder
+                const templateFolder = await createFolder(projectName, kdtTemplatesFolder.id);
+                const pdfTemplatesFolder = await createFolder('PDF_Templates', templateFolder.id);
+                
+                return {
+                    templatesRoot: kdtTemplatesFolder.id,
+                    activeRoot: kdtActiveFolder.id,
+                    templateFolder: templateFolder.id,
+                    pdfTemplatesFolder: pdfTemplatesFolder.id
+                };
             } catch (error) {
-                console.error('Error loading projects:', error);
-                projects = [];
-                showStatus('Error loading projects from storage.', 'error');
+                console.error('Error creating project folders:', error);
+                throw error;
             }
         }
         
-        function renderProjectList() {
-            const container = document.getElementById('projectList');
-            if (!container) return;
-            
-            if (projects.length === 0) {
-                container.innerHTML = '<p style="color: #718096; text-align: center; padding: 40px;">No projects yet. Create your first project!</p>';
-                return;
-            }
-            
-            let html = '';
-            projects.forEach((project, index) => {
-                html += `
-                    <div class="project-card" onclick="loadProject(${index})">
-                        <h4>${project.name}</h4>
-                        <p style="color: #718096; margin: 10px 0;">
-                            Created: ${new Date(project.created).toLocaleDateString()}
-                        </p>
-                        <p style="color: #718096;">
-                            Base Folder: ${project.baseFolder || 'Not set'}
-                        </p>
-                        <div style="margin-top: 15px; display: flex; gap: 10px;">
-                            <button onclick="event.stopPropagation(); loadProject(${index})" class="btn-warning" style="width: auto; padding: 8px 15px; font-size: 0.9rem;">
-                                Edit
-                            </button>
-                            <button onclick="event.stopPropagation(); deleteProject(${index})" class="btn-danger" style="width: auto; padding: 8px 15px; font-size: 0.9rem;">
-                                Delete
-                            </button>
-                        </div>
-                    </div>
-                `;
-            });
-            
-            container.innerHTML = html;
-        }
-        
-        function createNewProject() {
-            currentProject = {
-                name: '',
-                created: new Date().toISOString(),
-                baseFolder: '',
-                timesheetData: null,
-                pdfTemplates: []
+        async function createFolder(name, parentId) {
+            const metadata = {
+                name: name,
+                mimeType: 'application/vnd.google-apps.folder'
             };
             
-            document.getElementById('projectSetupStep').style.display = 'block';
-            document.getElementById('currentProjectName').textContent = 'New Project';
-            document.getElementById('projectNameInput').value = '';
-            document.getElementById('baseFolderInput').value = '';
-            document.getElementById('timesheetPreview').innerHTML = '';
-            document.getElementById('pdfTemplateStep').style.display = 'none';
-            
-            // Scroll to project setup
-            document.getElementById('projectSetupStep').scrollIntoView({ behavior: 'smooth' });
-        }
-        
-        function updateProjectName() {
-            const name = document.getElementById('projectNameInput').value;
-            document.getElementById('currentProjectName').textContent = name || 'New Project';
-        }
-        
-        function updateBaseFolder() {
-            // This function can be expanded if needed
-        }
-        
-        function loadProject(index) {
-            if (index < 0 || index >= projects.length) {
-                showStatus('Invalid project index.', 'error');
-                return;
+            if (parentId) {
+                metadata.parents = [parentId];
             }
             
-            currentProject = projects[index];
-            document.getElementById('projectSetupStep').style.display = 'block';
-            document.getElementById('currentProjectName').textContent = currentProject.name;
-            document.getElementById('projectNameInput').value = currentProject.name;
-            document.getElementById('baseFolderInput').value = currentProject.baseFolder || '';
-            
-            if (currentProject.timesheetData) {
-                timesheetData = currentProject.timesheetData;
-                displayTimesheetPreview();
-                document.getElementById('pdfTemplateStep').style.display = 'block';
-            }
-            
-            if (currentProject.pdfTemplateData) {
-                pdfTemplates = currentProject.pdfTemplateData.map(templateData => ({
-                    name: templateData.name,
-                    type: templateData.type,
-                    file: base64ToFile(templateData.data, templateData.name)
-                }));
-                displayPDFPreview();
-            }
-            
-            // Scroll to project setup
-            document.getElementById('projectSetupStep').scrollIntoView({ behavior: 'smooth' });
-        }
-        
-        function deleteProject(index) {
-            if (index < 0 || index >= projects.length) {
-                showStatus('Invalid project index.', 'error');
-                return;
-            }
-            
-            if (confirm('Are you sure you want to delete this project? This action cannot be undone.')) {
-                projects.splice(index, 1);
-                try {
-                    localStorage.setItem('kdtProjects', JSON.stringify(projects));
-                    renderProjectList();
-                    showStatus('Project deleted successfully.', 'success');
-                } catch (error) {
-                    console.error('Error saving projects:', error);
-                    showStatus('Error saving project changes.', 'error');
-                }
-            }
-        }
-        
-        function cancelEdit() {
-            currentProject = null;
-            timesheetData = null;
-            pdfTemplates = [];
-            document.getElementById('projectSetupStep').style.display = 'none';
-            document.getElementById('pdfTemplateStep').style.display = 'none';
-            showStatus('Project editing cancelled.', 'info');
-        }
-        
-        // Timesheet Processing
-        function handleTimesheetUpload(event) {
-            const file = event.target.files[0];
-            if (!file) return;
-            
-            showStatus('Processing timesheet...', 'info');
-            
-            const reader = new FileReader();
-            reader.onload = function(e) {
-                try {
-                    const workbook = XLSX.read(e.target.result, { type: 'array', cellDates: true });
-                    const worksheet = workbook.Sheets[workbook.SheetNames[0]];
-                    const jsonData = XLSX.utils.sheet_to_json(worksheet, { header: 1 });
-                    
-                    // Process the timesheet data in a way that avoids recursion
-                    setTimeout(() => {
-                        try {
-                            timesheetData = processTimesheetData(jsonData);
-                            currentProject.timesheetData = timesheetData;
-                            
-                            displayTimesheetPreview();
-                            document.getElementById('pdfTemplateStep').style.display = 'block';
-                            
-                            showStatus('Timesheet processed successfully!', 'success');
-                        } catch (error) {
-                            console.error('Error processing timesheet data:', error);
-                            showStatus('Error processing timesheet: ' + error.message, 'error');
-                        }
-                    }, 0);
-                } catch (error) {
-                    console.error('Error parsing timesheet:', error);
-                    showStatus('Error parsing timesheet: ' + error.message, 'error');
-                }
-            };
-            reader.onerror = function(error) {
-                console.error('Error reading file:', error);
-                showStatus('Error reading file: ' + error.message, 'error');
-            };
-            reader.readAsArrayBuffer(file);
-        }
-        
-        function processTimesheetData(jsonData) {
-            // Add a limit to prevent infinite loops
-            const MAX_ROWS = 1000;
-            
-            const fireName = jsonData[0] && jsonData[0][1] ? jsonData[0][1] : 'Unknown Fire';
-            const dateRow = jsonData[3];
-            const dates = [];
-            
-            for (let i = 4; i < dateRow.length && i < MAX_ROWS; i += 2) {
-                if (dateRow[i] && dateRow[i + 1]) {
-                    dates.push({
-                        dayName: dateRow[i],
-                        date: dateRow[i + 1],
-                        workedCol: i,
-                        milesCol: i + 1
-                    });
-                }
-            }
-            
-            const employees = [];
-            for (let i = 5; i < jsonData.length && i < MAX_ROWS; i++) {
-                const row = jsonData[i];
-                if (!row || !row[0] || typeof row[0] !== 'string') continue;
-                
-                const name = row[0].trim();
-                if (!name || 
-                    name.toLowerCase().includes('total') || 
-                    name.toLowerCase().includes('combined') ||
-                    name === 'GUARDS' || name === 'MANAGER' || name === 'SUPERVISORS' ||
-                    name.toLowerCase().includes('charge') ||
-                    name.toLowerCase().includes('daily') ||
-                    name === '') {
-                    continue;
-                }
-                
-                let classification = 'Guard';
-                // Limit the backward search to prevent excessive looping
-                const searchLimit = Math.max(0, i - 50); // Look back at most 50 rows
-                for (let j = i - 1; j >= searchLimit; j--) {
-                    const prevRow = jsonData[j];
-                    if (prevRow && prevRow[0]) {
-                        const prevName = String(prevRow[0]).toLowerCase();
-                        if (prevName.includes('manager')) {
-                            classification = 'Manager';
-                            break;
-                        } else if (prevName.includes('supervisor')) {
-                            classification = 'Supervisor';
-                            break;
-                        } else if (prevName.includes('guard')) {
-                            classification = 'Guard';
-                            break;
-                        }
-                    }
-                }
-                
-                let hasData = false;
-                for (let col = 4; col < row.length && col < MAX_ROWS; col += 2) {
-                    if (row[col] && row[col] > 0) {
-                        hasData = true;
-                        break;
-                    }
-                }
-                
-                if (hasData) {
-                    employees.push({
-                        name: name,
-                        classification: classification,
-                        rowData: row
-                    });
-                }
-            }
-            
-            return {
-                fireName: fireName,
-                dates: dates,
-                employees: employees,
-                rawData: jsonData
-            };
-        }
-        
-        function displayTimesheetPreview() {
-            if (!timesheetData) return;
-            
-            const preview = document.getElementById('timesheetPreview');
-            const counts = { Guard: 0, Manager: 0, Supervisor: 0 };
-            timesheetData.employees.forEach(emp => {
-                counts[emp.classification]++;
+            const response = await gapi.client.drive.files.create({
+                resource: metadata
             });
             
-            let html = `
-                <div style="background: #f8f9fa; padding: 20px; border-radius: 8px; margin: 20px 0;">
-                    <h4>Timesheet Preview</h4>
-                    <p><strong>Fire Name:</strong> ${timesheetData.fireName}</p>
-                    <p><strong>Dates Available:</strong> ${timesheetData.dates.length} days</p>
-                    <p><strong>Employees:</strong> ${timesheetData.employees.length} total</p>
-                    <div style="margin-top: 15px;">
-                        <strong>Employee Breakdown:</strong><br>
-            `;
-            
-            Object.entries(counts).forEach(([type, count]) => {
-                if (count > 0) {
-                    html += `${type}s: ${count} &nbsp;&nbsp;`;
-                }
-            });
-            
-            html += '</div></div>';
-            preview.innerHTML = html;
+            return response.result;
         }
         
-        // PDF Template Handling
-        function handlePDFUpload(event) {
-            const files = Array.from(event.target.files);
-            if (!files.length) return;
-            
-            pdfTemplates = [];
-            files.forEach(file => {
-                pdfTemplates.push({
-                    name: file.name,
-                    file: file,
-                    type: file.name.toLowerCase().includes('ctr') ? 'ctr' : 
-                          file.name.toLowerCase().includes('shift') ? 'shift' : 'unknown'
-                });
-            });
-            
-            displayPDFPreview();
-        }
-        
-        function displayPDFPreview() {
-            const preview = document.getElementById('pdfFormsPreview');
-            if (pdfTemplates.length === 0) {
-                preview.innerHTML = '';
-                return;
+        async function createActiveProjectFolders(projectName, templateFolderId) {
+            if (!isAuthenticated || !gapiLoaded) {
+                throw new Error('Not authenticated with Google Drive');
             }
             
-            let html = '<div style="background: #f8f9fa; padding: 20px; border-radius: 8px;"><h4>PDF Templates</h4>';
-            pdfTemplates.forEach(template => {
-                html += `
-                    <div style="display: flex; justify-content: space-between; align-items: center; padding: 10px; background: white; border-radius: 6px; margin-bottom: 10px;">
-                        <div>
-                            <strong>${template.name}</strong>
-                            <div style="color: #718096; font-size: 0.9rem;">Type: ${template.type.toUpperCase()}</div>
-                        </div>
-                    </div>
-                `;
-            });
-            html += '</div>';
-            
-            preview.innerHTML = html;
-        }
-        
-        function clearAllForms() {
-            pdfTemplates = [];
-            document.getElementById('pdfFile').value = '';
-            displayPDFPreview();
-            showStatus('PDF templates cleared.', 'info');
-        }
-        
-        function base64ToFile(base64, filename) {
-            const byteCharacters = atob(base64);
-            const byteNumbers = new Array(byteCharacters.length);
-            for (let i = 0; i < byteCharacters.length; i++) {
-                byteNumbers[i] = byteCharacters.charCodeAt(i);
-            }
-            const byteArray = new Uint8Array(byteNumbers);
-            return new File([byteArray], filename, { type: 'application/pdf' });
-        }
-        
-        function saveProject() {
-            const projectName = document.getElementById('projectNameInput').value.trim();
-            const baseFolder = document.getElementById('baseFolderInput').value.trim();
-            
-            if (!projectName) {
-                showStatus('Please enter a project name.', 'error');
-                return;
-            }
-            
-            if (!timesheetData) {
-                showStatus('Please upload a timesheet first.', 'error');
-                return;
-            }
-            
-            if (!pdfTemplates || pdfTemplates.length === 0) {
-                showStatus('Please upload PDF templates first.', 'error');
-                return;
-            }
-            
-            showStatus('Saving project...', 'info');
-            
-            // Store PDF template data as base64 for persistence
-            const templatePromises = pdfTemplates.map(template => {
-                return new Promise((resolve) => {
-                    const reader = new FileReader();
-                    reader.onload = function(e) {
-                        const arrayBuffer = e.target.result;
-                        const base64 = btoa(String.fromCharCode(...new Uint8Array(arrayBuffer)));
-                        resolve({
-                            name: template.name,
-                            type: template.type,
-                            data: base64
-                        });
-                    };
-                    reader.readAsArrayBuffer(template.file);
-                });
-            });
-            
-            Promise.all(templatePromises).then(templateData => {
-                currentProject.name = projectName;
-                currentProject.baseFolder = baseFolder;
-                currentProject.pdfTemplateData = templateData;
-                currentProject.updated = new Date().toISOString();
+            try {
+                // Find or create the active projects root folder
+                const activeRootFolder = await findOrCreateFolder('KDT_Active_Projects', null);
                 
-                const existingIndex = projects.findIndex(p => p.name === projectName);
-                if (existingIndex >= 0) {
-                    projects[existingIndex] = currentProject;
+                // Create the new project folder
+                const projectFolder = await createFolder(projectName, activeRootFolder.id);
+                const timesheetsFolder = await createFolder('Timesheets', projectFolder.id);
+                const generatedPDFsFolder = await createFolder('Generated_PDFs', projectFolder.id);
+                
+                return {
+                    projectFolder: projectFolder.id,
+                    timesheetsFolder: timesheetsFolder.id,
+                    generatedPDFsFolder: generatedPDFsFolder.id
+                };
+            } catch (error) {
+                console.error('Error creating active project folders:', error);
+                throw error;
+            }
+        }
+        
+        async function findOrCreateFolder(name, parentId) {
+            try {
+                // Search for existing folder
+                let query = `name='${name}' and mimeType='application/vnd.google-apps.folder' and trashed=false`;
+                if (parentId) {
+                    query += ` and '${parentId}' in parents`;
                 } else {
-                    projects.push(currentProject);
+                    query += ` and 'root' in parents`;
                 }
                 
-                try {
-                    localStorage.setItem('kdtProjects', JSON.stringify(projects));
-                    renderProjectList();
-                    
-                    showStatus(`Project "${projectName}" saved successfully!`, 'success');
-                    
-                    // Reset form
-                    document.getElementById('projectSetupStep').style.display = 'none';
-                    document.getElementById('pdfTemplateStep').style.display = 'none';
-                    currentProject = null;
-                    timesheetData = null;
-                    pdfTemplates = [];
-                } catch (error) {
-                    console.error('Error saving project:', error);
-                    showStatus('Error saving project: ' + error.message, 'error');
-                }
-            }).catch(error => {
-                console.error('Error saving project:', error);
-                showStatus('Error saving project: ' + error.message, 'error');
-            });
-        }
-        
-        // User Mode Functions
-        function loadUserProjects() {
-            const container = document.getElementById('userProjectList');
-            if (!container) return;
-            
-            if (projects.length === 0) {
-                container.innerHTML = '<p style="color: #718096; text-align: center; padding: 40px;">No projects available. Contact your administrator to create projects.</p>';
-                return;
-            }
-            
-            let html = '';
-            projects.forEach((project, index) => {
-                html += `
-                    <div class="project-card" onclick="selectUserProject(${index})">
-                        <h4>${project.name}</h4>
-                        <p style="color: #718096; margin: 10px 0;">
-                            ${project.timesheetData ? project.timesheetData.dates.length : 0} days available
-                        </p>
-                        <p style="color: #718096;">
-                            ${project.timesheetData ? project.timesheetData.employees.length : 0} employees
-                        </p>
-                        <div class="progress-bar">
-                            <div class="progress-bar-fill" style="width: ${project.timesheetData ? 100 : 0}%"></div>
-                        </div>
-                    </div>
-                `;
-            });
-            
-            container.innerHTML = html;
-        }
-        
-        function selectUserProject(index) {
-            if (index < 0 || index >= projects.length) {
-                showStatus('Invalid project index.', 'error');
-                return;
-            }
-            
-            currentProject = projects[index];
-            timesheetData = currentProject.timesheetData;
-            
-            // Restore PDF templates from stored data
-            if (currentProject.pdfTemplateData) {
-                pdfTemplates = currentProject.pdfTemplateData.map(templateData => ({
-                    name: templateData.name,
-                    type: templateData.type,
-                    file: base64ToFile(templateData.data, templateData.name)
-                }));
-            } else {
-                pdfTemplates = [];
-            }
-            
-            document.getElementById('userWorkflow').style.display = 'block';
-            displayUserDaySelector();
-            showStatus(`Selected project: ${currentProject.name}`, 'success');
-            
-            // Scroll to workflow
-            document.getElementById('userWorkflow').scrollIntoView({ behavior: 'smooth' });
-        }
-        
-        function displayUserDaySelector() {
-            if (!timesheetData || !timesheetData.dates) return;
-            
-            const container = document.getElementById('daySelector');
-            if (!container) return;
-            
-            let html = '<h4>Select a day to process:</h4><div class="day-grid">';
-            
-            timesheetData.dates.forEach((dateInfo, index) => {
-                const dateStr = dateInfo.date instanceof Date ? 
-                    dateInfo.date.toLocaleDateString() : 
-                    new Date(dateInfo.date).toLocaleDateString();
+                const response = await gapi.client.drive.files.list({
+                    q: query
+                });
                 
-                const daySummary = calculateDaySummary(dateInfo);
-                
-                html += `
-                    <div class="day-card" onclick="selectDay(${index})" id="dayCard${index}">
-                        <h4>${dateInfo.dayName}</h4>
-                        <div>${dateStr}</div>
-                        <div class="stats">
-                            People: ${daySummary.totalPeople}<br>
-                            Miles: ${daySummary.totalMiles}
-                        </div>
-                    </div>
-                `;
-            });
-            
-            html += '</div>';
-            container.innerHTML = html;
-        }
-        
-        function calculateDaySummary(dateInfo) {
-            let totalPeople = 0;
-            let totalMiles = 0;
-            
-            timesheetData.employees.forEach(emp => {
-                const worked = emp.rowData[dateInfo.workedCol];
-                const miles = emp.rowData[dateInfo.milesCol] || 0;
-                
-                if (worked >= 8 && worked <= 16) {
-                    totalPeople++;
+                if (response.result.files && response.result.files.length > 0) {
+                    return response.result.files[0];
+                } else {
+                    return await createFolder(name, parentId);
                 }
-                totalMiles += miles;
-            });
-            
-            return { totalPeople, totalMiles };
+            } catch (error) {
+                console.error('Error finding/creating folder:', error);
+                return await createFolder(name, parentId);
+            }
         }
-        
-        function selectDay(index) {
-            if (!timesheetData.dates || index < 0 || index >= timesheetData.dates.length) {
-                showStatus('Invalid day selection.', 'error');
-                return;
-            }
-            
-            selectedDay = timesheetData.dates[index];
-            
-            // Update visual selection
-            document.querySelectorAll('.day-card').forEach(card => {
-                card.classList.remove('selected');
-            });
-            
-            const selectedCard = document.getElementById(`dayCard${index}`);
-            if (selectedCard) {
-                selectedCard.classList.add('selected');
-            }
-            
-            displaySelectedDayPreview();
-            document.getElementById('selectedDayPreview').style.display = 'block';
-            
-            // Scroll to preview
-            document.getElementById('selectedDayPreview').scrollIntoView({ behavior: 'smooth', block: 'start' });
-        }
-        
-        function displaySelectedDayPreview() {
-            if (!selectedDay) return;
-            
-            const dateStr = selectedDay.date instanceof Date ? 
-                selectedDay.date.toLocaleDateString() : 
-                new Date(selectedDay.date).toLocaleDateString();
-            
-            const dayEmployees = [];
-            timesheetData.employees.forEach(emp => {
-                const worked = emp.rowData[selectedDay.workedCol];
-                const miles = emp.rowData[selectedDay.milesCol] || 0;
-                
-                if (worked >= 8 && worked <= 16) {
-                    dayEmployees.push({
-                        name: emp.name,
-                        classification: emp.classification,
-                        worked: worked,
-                        miles: miles
-                    });
-                }
-            });
-            
-            const totalPeople = dayEmployees.length;
-            const totalMiles = dayEmployees.reduce((sum, emp) => sum + emp.miles, 0);
-            
-            const summaryHtml = `
-                <div style="background: #f8f9fa; padding: 15px; border-radius: 8px; margin: 15px 0;">
-                    <p><strong>Date:</strong> ${selectedDay.dayName} ${dateStr}</p>
-                    <p><strong>Total People Worked:</strong> ${totalPeople} days</p>
-                    <p><strong>Total Miles:</strong> ${totalMiles}</p>
-                    <p><strong>Contractor/Agency:</strong> Knight Division Tactical</p>
-                    <p><strong>Operator:</strong> KDT</p>
-                </div>
-            `;
-            
-            document.getElementById('summaryInfo').innerHTML = summaryHtml;
-        }
-        
-        function generatePDFs() {
-            if (!selectedDay) {
-                showStatus('Please select a day first.', 'error');
-                return;
-            }
-            
-            const fireName = document.getElementById('fireNameInput').value.trim();
-            const userName = document.getElementById('userNameInput').value.trim();
-            
-            if (!fireName || !userName) {
-                showStatus('Please enter both fire name and your name.', 'error');
-                return;
-            }
-            
-            const generateCTR = document.getElementById('generateCTR').checked;
-            const generateShift = document.getElementById('generateShift').checked;
-            
-            if (!generateCTR && !generateShift) {
-                showStatus('Please select at least one PDF to generate.', 'error');
-                return;
-            }
-            
-            showStatus('Generating PDFs...', 'info');
-            
-            // Disable generate button during processing
-            const generateBtn = document.getElementById('generateBtn');
-            if (generateBtn) {
-                generateBtn.disabled = true;
-                generateBtn.innerHTML = 'Generating...';
-            }
-            
-            const promises = [];
-            
-            if (generateCTR) {
-                promises.push(generateCTRPDF(fireName, userName));
-            }
-            
-            if (generateShift) {
-                promises.push(generateShiftTicketPDF(fireName, userName));
-            }
-            
-            Promise.all(promises).then(() => {
-                showStatus('PDFs generated and downloaded successfully!', 'success');
-                if (generateBtn) {
-                    generateBtn.disabled = false;
-                    generateBtn.innerHTML = 'Generate & Download PDFs';
-                }
-            }).catch(error => {
-                console.error('Error generating PDFs:', error);
-                showStatus('Error generating PDFs: ' + error.message, 'error');
-                if (generateBtn) {
-                    generateBtn.disabled = false;
-                    generateBtn.innerHTML = 'Generate & Download PDFs';
-                }
-            });
-        }
-        
-        function generateCTRPDF(fireName, userName) {
-            return new Promise((resolve, reject) => {
-                const ctrTemplate = pdfTemplates.find(t => t.type === 'ctr');
-                if (!ctrTemplate) {
-                    reject(new Error('CTR template not found'));
-                    return;
-                }
-                
-                const reader = new FileReader();
-                reader.onload = async function(e) {
-                    try {
-                        const pdfDoc = await PDFLib.PDFDocument.load(e.target.result);
-                        const form = pdfDoc.getForm();
-                        const fields = form.getFields();
-                        
-                        const dateStr = selectedDay.date instanceof Date ? 
-                            selectedDay.date.toLocaleDateString() : 
-                            new Date(selectedDay.date).toLocaleDateString();
-                        
-                        const dayEmployees = timesheetData.employees.filter(emp => {
-                            const worked = emp.rowData[selectedDay.workedCol];
-                            return worked >= 8 && worked <= 16;
-                        });
-                        
-                        // Map classification to ACL titles
-                        const classificationMap = {
-                            'Guard': 'ACL Liaison',
-                            'Manager': 'ACL Manager',
-                            'Supervisor': 'ACL Supervisor'
-                        };
-                        
-                        // Fill basic fields
-                        fields.forEach(field => {
-                            const fieldName = field.getName().toLowerCase();
-                            
-                            try {
-                                if (fieldName.includes('crew') || fieldName.includes('agency')) {
-                                    field.setText('Knight Division Tactical');
-                                } else if (fieldName.includes('fire') || fieldName.includes('incident')) {
-                                    field.setText(fireName);
-                                } else if (fieldName.includes('date')) {
-                                    field.setText(dateStr);
-                                } else if (fieldName.includes('crew number')) {
-                                    // Extract RO number from timesheet if available
-                                    const roNumber = timesheetData.rawData[59] && timesheetData.rawData[59][11] ? 
-                                        timesheetData.rawData[59][11] : 'RO_12345';
-                                    field.setText(roNumber);
-                                } else if (fieldName.includes('fire number')) {
-                                    // Extract incident number from timesheet if available
-                                    const incidentNumber = timesheetData.rawData[58] && timesheetData.rawData[58][11] ? 
-                                        timesheetData.rawData[58][11] : 'Incident_12345';
-                                    field.setText(incidentNumber);
-                                }
-                            } catch (e) {
-                                console.warn(`Could not fill field ${field.getName()}`);
-                            }
-                        });
-                        
-                        // Fill employee data - map to available fields
-                        dayEmployees.forEach((emp, index) => {
-                            // Convert classification to ACL title
-                            const aclClassification = classificationMap[emp.classification] || emp.classification;
-                            
-                            // Try to find fields for this employee
-                            let nameField = null;
-                            let classField = null;
-                            let dateField = null;
-                            
-                            fields.forEach(field => {
-                                const fieldName = field.getName().toLowerCase();
-                                
-                                // Look for field patterns like "text1", "text2", etc.
-                                if (fieldName.includes(`${index + 1}`) || fieldName.includes(`_${index + 1}`)) {
-                                    if (fieldName.includes('name') || (!fieldName.includes('class') && !fieldName.includes('date'))) {
-                                        nameField = field;
-                                    } else if (fieldName.includes('class')) {
-                                        classField = field;
-                                    } else if (fieldName.includes('date')) {
-                                        dateField = field;
-                                    }
-                                }
-                            });
-                            
-                            // Fill the fields if found
-                            if (nameField) {
-                                try {
-                                    nameField.setText(emp.name);
-                                } catch (e) {
-                                    console.warn(`Could not set name for ${emp.name}`);
-                                }
-                            }
-                            
-                            if (classField) {
-                                try {
-                                    classField.setText(aclClassification);
-                                } catch (e) {
-                                    console.warn(`Could not set class for ${emp.name}`);
-                                }
-                            }
-                            
-                            if (dateField) {
-                                try {
-                                    dateField.setText(dateStr);
-                                } catch (e) {
-                                    console.warn(`Could not set date for ${emp.name}`);
-                                }
-                            }
-                        });
-                        
-                        // Fill any remaining fields with placeholders
-                        for (let i = dayEmployees.length; i < 20; i++) {
-                            fields.forEach(field => {
-                                const fieldName = field.getName().toLowerCase();
-                                if (fieldName.includes(`${i + 1}`) || fieldName.includes(`_${i + 1}`)) {
-                                    try {
-                                        if (fieldName.includes('name') || (!fieldName.includes('class') && !fieldName.includes('date'))) {
-                                            field.setText(`Name${i+1}+`);
-                                        } else if (fieldName.includes('class')) {
-                                            field.setText(`Classification${i+1}+`);
-                                        }
-                                    } catch (e) {
-                                        // Ignore errors for placeholder fields
-                                    }
-                                }
-                            });
-                        }
-                        
-                        const pdfBytes = await pdfDoc.save();
-                        const filename = `${fireName}_${userName}_CTR_${dateStr.replace(/\//g, '-')}.pdf`;
-                        downloadPDF(pdfBytes, filename);
-                        resolve();
-                    } catch (error) {
-                        reject(error);
-                    }
-                };
-                reader.readAsArrayBuffer(ctrTemplate.file);
-            });
-        }
-        
-        function generateShiftTicketPDF(fireName, userName) {
-            return new Promise((resolve, reject) => {
-                const shiftTemplate = pdfTemplates.find(t => t.type === 'shift');
-                if (!shiftTemplate) {
-                    reject(new Error('Shift Ticket template not found'));
-                    return;
-                }
-                
-                const reader = new FileReader();
-                reader.onload = async function(e) {
-                    try {
-                        const pdfDoc = await PDFLib.PDFDocument.load(e.target.result);
-                        const form = pdfDoc.getForm();
-                        const fields = form.getFields();
-                        
-                        const dateStr = selectedDay.date instanceof Date ? 
-                            selectedDay.date.toLocaleDateString() : 
-                            new Date(selectedDay.date).toLocaleDateString();
-                        
-                        const dayEmployees = timesheetData.employees.filter(emp => {
-                            const worked = emp.rowData[selectedDay.workedCol];
-                            return worked >= 8 && worked <= 16;
-                        });
-                        
-                        // Count employees by classification
-                        const counts = { Guard: 0, Manager: 0, Supervisor: 0 };
-                        dayEmployees.forEach(emp => {
-                            counts[emp.classification]++;
-                        });
-                        
-                        const totalPeople = dayEmployees.length;
-                        const totalMiles = dayEmployees.reduce((sum, emp) => {
-                            return sum + (emp.rowData[selectedDay.milesCol] || 0);
-                        }, 0);
-                        
-                        // Fill fields based on field names and patterns
-                        fields.forEach(field => {
-                            const fieldName = field.getName().toLowerCase();
-                            
-                            try {
-                                if (fieldName.includes('contractor') || fieldName.includes('agency')) {
-                                    field.setText('Knight Division Tactical');
-                                } else if (fieldName.includes('incident') || fieldName.includes('fire')) {
-                                    field.setText(fireName);
-                                } else if (fieldName.includes('date')) {
-                                    field.setText(dateStr);
-                                } else if (fieldName.includes('resource order')) {
-                                    // Extract RO number from timesheet if available
-                                    const roNumber = timesheetData.rawData[59] && timesheetData.rawData[59][11] ? 
-                                        timesheetData.rawData[59][11] : 'RO_12345';
-                                    field.setText(roNumber);
-                                } else if (fieldName.includes('incident number')) {
-                                    // Extract incident number from timesheet if available
-                                    const incidentNumber = timesheetData.rawData[58] && timesheetData.rawData[58][11] ? 
-                                        timesheetData.rawData[58][11] : 'Incident_12345';
-                                    field.setText(incidentNumber);
-                                } else if (fieldName.includes('agreement number')) {
-                                    // Extract agreement number from timesheet if available
-                                    const agreementNumber = timesheetData.rawData[60] && timesheetData.rawData[60][11] ? 
-                                        timesheetData.rawData[60][11] : '140L372';
-                                    field.setText(agreementNumber);
-                                } else if (fieldName.includes('total') && fieldName.includes('hour')) {
-                                    field.setText(totalPeople.toString());
-                                } else if (fieldName.includes('miles') && fieldName.includes('quantity')) {
-                                    field.setText(totalMiles.toString());
-                                } else if (fieldName.includes('operator')) {
-                                    field.setText('KDT');
-                                } else if (fieldName.includes('total') && !fieldName.includes('hour')) {
-                                    field.setText(totalPeople.toString());
-                                }
-                                
-                                // Set hours to "12 Hours" for all employees
-                                if (fieldName.includes('hour') && field.constructor.name !== 'PDFCheckBox') {
-                                    field.setText('12 Hours');
-                                }
-                                
-                                // Check the miles checkbox
-                                if (fieldName.includes('miles') && field.constructor.name === 'PDFCheckBox') {
-                                    field.check();
-                                }
-                            } catch (e) {
-                                console.warn(`Could not fill field ${field.getName()}`);
-                            }
-                        });
-                        
-                        const pdfBytes = await pdfDoc.save();
-                        const filename = `${fireName}_${userName}_ShiftTicket_${dateStr.replace(/\//g, '-')}.pdf`;
-                        downloadPDF(pdfBytes, filename);
-                        resolve();
-                    } catch (error) {
-                        reject(error);
-                    }
-                };
-                reader.readAsArrayBuffer(shiftTemplate.file);
-            });
-        }
-        
-        function downloadPDF(pdfBytes, filename) {
-            const blob = new Blob([pdfBytes], { type: 'application/pdf' });
-            const url = URL.createObjectURL(blob);
-            const a = document.createElement('a');
-            a.href = url;
-            a.download = filename;
-            document.body.appendChild(a);
-            a.click();
-            document.body.removeChild(a);
-            URL.revokeObjectURL(url);
-        }
-    </script>
-</body>
-</html>
