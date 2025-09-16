@@ -1,4 +1,288 @@
-<!DOCTYPE html>
+async function refreshProjectData() {
+            if (!currentProject) {
+                showStatus('No project selected.', 'error');
+                return;
+            
+        // Helper functions for PDF template handling
+        function findPDFTemplate(type) {
+            if (!selectedTemplate || !selectedTemplate.pdfFiles) {
+                return null;
+            }
+            
+            return selectedTemplate.pdfFiles.find(file => {
+                const fileName = file.name.toLowerCase();
+                if (type === 'ctr') {
+                    return fileName.includes('ctr');
+                } else if (type === 'shift') {
+                    return fileName.includes('shift');
+                }
+                return false;
+            });
+        }
+        
+        async function downloadPDFTemplate(fileId) {
+            const response = await gapi.client.drive.files.get({
+                fileId: fileId,
+                alt: 'media'
+            });
+            
+            // Convert response to ArrayBuffer
+            const base64Data = response.body;
+            const binaryString = atob(base64Data);
+            const bytes = new Uint8Array(binaryString.length);
+            for (let i = 0; i < binaryString.length; i++) {
+                bytes[i] = binaryString.charCodeAt(i);
+            }
+            return bytes.buffer;
+        }
+        
+        async function savePDFToGoogleDrive(pdfBytes, filename) {
+            if (!currentProject || !currentProject.driveStructure.generatedPDFsFolder) {
+                console.warn('No Generated_PDFs folder found for current project');
+                return;
+            }
+            
+            try {
+                const blob = new Blob([pdfBytes], { type: 'application/pdf' });
+                const metadata = {
+                    name: filename,
+                    parents: [currentProject.driveStructure.generatedPDFsFolder]
+                };
+                
+                // Use the simpler upload method
+                const formData = new FormData();
+                formData.append('metadata', new Blob([JSON.stringify(metadata)], { type: 'application/json' }));
+                formData.append('file', blob);
+                
+                const response = await fetch('https://www.googleapis.com/upload/drive/v3/files?uploadType=multipart', {
+                    method: 'POST',
+                    headers: {
+                        'Authorization': `Bearer ${accessToken}`
+                    },
+                    body: formData
+                });
+                
+                if (response.ok) {
+                    console.log(`PDF ${filename} saved to Google Drive`);
+                } else {
+                    console.error('Error saving PDF to Google Drive:', await response.text());
+                }
+                
+            } catch (error) {
+                console.error('Error saving PDF to Google Drive:', error);
+            }
+        }
+            
+            showStatus('Refreshing data from Google Sheets...', 'info');
+            
+            try {
+                // Rescan the current project to get latest timesheet files
+                if (currentProject.isActiveProject) {
+                    const updatedProject = await scanActiveProjectFolder({ 
+                        id: currentProject.driveFolderId, 
+                        name: currentProject.name 
+                    });
+                    if (updatedProject) {
+                        // Update current project with latest data
+                        currentProject.timesheetFiles = updatedProject.timesheetFiles;
+                        displayTimesheetsList();
+                    }
+                }
+                
+                // Read timesheet data from all available sheets
+                await loadTimesheetDataFromGoogleSheets();
+                
+                if (timesheetData && timesheetData.dates && timesheetData.dates.length > 0) {
+                    displayUserDaySelector();
+                    showStatus('Data refreshed successfully!', 'success');
+                } else {
+                    showStatus('No timesheet data found. Please check your Google Sheets.', 'error');
+                }
+                
+            } catch (error) {
+                console.error('Error refreshing project data:', error);
+                showStatus('Error refreshing data: ' + error.message, 'error');
+            }
+        }
+        
+        function displayTimesheetsList() {
+            const container = document.getElementById('timesheetsList');
+            if (!container || !currentProject || !currentProject.timesheetFiles) return;
+            
+            const timesheets = currentProject.timesheetFiles;
+            
+            if (timesheets.length === 0) {
+                container.innerHTML = '<p style="color: #718096;">No timesheets found in this project.</p>';
+                return;
+            }
+            
+            let html = '<h4>Available Timesheets:</h4><div style="display: grid; grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); gap: 10px;">';
+            
+            timesheets.forEach((sheet, index) => {
+                html += `
+                    <div style="background: white; border: 1px solid #dee2e6; border-radius: 6px; padding: 10px;">
+                        <strong>${sheet.name}</strong>
+                        <div style="color: #718096; font-size: 0.9rem;">Modified: ${new Date(sheet.modifiedTime).toLocaleDateString()}</div>
+                    </div>
+                `;
+            });
+            
+            html += '</div>';
+            container.innerHTML = html;
+        }
+        
+        async function loadTimesheetDataFromGoogleSheets() {
+            if (!currentProject || !currentProject.timesheetFiles || currentProject.timesheetFiles.length === 0) {
+                throw new Error('No timesheet files found');
+            }
+            
+            let combinedData = {
+                fireName: currentProject.name,
+                dates: [],
+                employees: [],
+                rawData: []
+            };
+            
+            // Load data from each timesheet file
+            for (const timesheetFile of currentProject.timesheetFiles) {
+                try {
+                    const sheetData = await loadSingleTimesheetData(timesheetFile.id);
+                    if (sheetData) {
+                        // Merge dates (avoiding duplicates)
+                        sheetData.dates.forEach(date => {
+                            const existingDate = combinedData.dates.find(d => 
+                                d.dayName === date.dayName && 
+                                new Date(d.date).getTime() === new Date(date.date).getTime()
+                            );
+                            if (!existingDate) {
+                                combinedData.dates.push({...date, sourceSheet: timesheetFile.name});
+                            }
+                        });
+                        
+                        // Merge employees (use latest data if duplicates)
+                        sheetData.employees.forEach(emp => {
+                            const existingEmpIndex = combinedData.employees.findIndex(e => e.name === emp.name);
+                            if (existingEmpIndex >= 0) {
+                                // Update existing employee with latest data
+                                combinedData.employees[existingEmpIndex] = {...emp, sourceSheet: timesheetFile.name};
+                            } else {
+                                combinedData.employees.push({...emp, sourceSheet: timesheetFile.name});
+                            }
+                        });
+                    }
+                } catch (error) {
+                    console.error(`Error loading timesheet ${timesheetFile.name}:`, error);
+                }
+            }
+            
+            // Sort dates chronologically
+            combinedData.dates.sort((a, b) => new Date(a.date) - new Date(b.date));
+            
+            timesheetData = combinedData;
+            return combinedData;
+        }
+        
+        async function loadSingleTimesheetData(sheetId) {
+            try {
+                // Read the entire sheet data
+                const response = await gapi.client.sheets.spreadsheets.values.get({
+                    spreadsheetId: sheetId,
+                    range: 'A1:Z100'  // Adjust range as needed
+                });
+                
+                if (!response.result.values) {
+                    return null;
+                }
+                
+                const jsonData = response.result.values;
+                
+                // Process using same logic as Excel processing
+                return processTimesheetData(jsonData);
+                
+            } catch (error) {
+                console.error('Error reading Google Sheet:', error);
+                throw error;
+            }
+        }
+        
+        // Restored processTimesheetData function for Google Sheets processing
+        function processTimesheetData(jsonData) {
+            const MAX_ROWS = 1000;
+            
+            const fireName = jsonData[0] && jsonData[0][1] ? jsonData[0][1] : 'Unknown Fire';
+            const dateRow = jsonData[3];
+            const dates = [];
+            
+            for (let i = 4; i < dateRow.length && i < MAX_ROWS; i += 2) {
+                if (dateRow[i] && dateRow[i + 1]) {
+                    dates.push({
+                        dayName: dateRow[i],
+                        date: dateRow[i + 1],
+                        workedCol: i,
+                        milesCol: i + 1
+                    });
+                }
+            }
+            
+            const employees = [];
+            for (let i = 5; i < jsonData.length && i < MAX_ROWS; i++) {
+                const row = jsonData[i];
+                if (!row || !row[0] || typeof row[0] !== 'string') continue;
+                
+                const name = row[0].trim();
+                if (!name || 
+                    name.toLowerCase().includes('total') || 
+                    name.toLowerCase().includes('combined') ||
+                    name === 'GUARDS' || name === 'MANAGER' || name === 'SUPERVISORS' ||
+                    name.toLowerCase().includes('charge') ||
+                    name.toLowerCase().includes('daily') ||
+                    name === '') {
+                    continue;
+                }
+                
+                let classification = 'Guard';
+                const searchLimit = Math.max(0, i - 50);
+                for (let j = i - 1; j >= searchLimit; j--) {
+                    const prevRow = jsonData[j];
+                    if (prevRow && prevRow[0]) {
+                        const prevName = String(prevRow[0]).toLowerCase();
+                        if (prevName.includes('manager')) {
+                            classification = 'Manager';
+                            break;
+                        } else if (prevName.includes('supervisor')) {
+                            classification = 'Supervisor';
+                            break;
+                        } else if (prevName.includes('guard')) {
+                            classification = 'Guard';
+                            break;
+                        }
+                    }
+                }
+                
+                let hasData = false;
+                for (let col = 4; col < row.length && col < MAX_ROWS; col += 2) {
+                    if (row[col] && row[col] > 0) {
+                        hasData = true;
+                        break;
+                    }
+                }
+                
+                if (hasData) {
+                    employees.push({
+                        name: name,
+                        classification: classification,
+                        rowData: row
+                    });
+                }
+            }
+            
+            return {
+                fireName: fireName,
+                dates: dates,
+                employees: employees,
+                rawData: jsonData
+            };
+        }<!DOCTYPE html>
 <html lang="en">
 <head>
     <meta charset="UTF-8">
@@ -14,6 +298,171 @@
             margin: 0;
             padding: 0;
             box-sizing: border-box;
+        }
+        
+        // NEW: Google Drive scanning functions to replace localStorage
+        async function scanGoogleDriveForProjects() {
+            if (!isAuthenticated || !gapiLoaded) {
+                console.log('Not ready to scan Google Drive');
+                return;
+            }
+            
+            try {
+                // Clear existing data
+                projects = [];
+                activeProjects = [];
+                
+                // Scan for template folders
+                await scanTemplatesFolders();
+                
+                // Scan for active project folders  
+                await scanActiveProjectsFolders();
+                
+                console.log('Google Drive scan complete:', { templates: projects.length, activeProjects: activeProjects.length });
+                
+            } catch (error) {
+                console.error('Error scanning Google Drive:', error);
+                showStatus('Error scanning Google Drive: ' + error.message, 'error');
+            }
+        }
+        
+        async function scanTemplatesFolders() {
+            try {
+                // Find KDT_Company_Templates folder
+                const templatesQuery = `name='KDT_Company_Templates' and mimeType='application/vnd.google-apps.folder' and trashed=false`;
+                const templatesResponse = await gapi.client.drive.files.list({ q: templatesQuery });
+                
+                if (!templatesResponse.result.files || templatesResponse.result.files.length === 0) {
+                    console.log('No KDT_Company_Templates folder found');
+                    return;
+                }
+                
+                const templatesFolderId = templatesResponse.result.files[0].id;
+                
+                // Get all template subfolders
+                const subFoldersQuery = `'${templatesFolderId}' in parents and mimeType='application/vnd.google-apps.folder' and trashed=false`;
+                const subFoldersResponse = await gapi.client.drive.files.list({ q: subFoldersQuery });
+                
+                for (const templateFolder of subFoldersResponse.result.files || []) {
+                    const template = await scanTemplateFolder(templateFolder);
+                    if (template) {
+                        projects.push(template);
+                    }
+                }
+                
+            } catch (error) {
+                console.error('Error scanning templates folders:', error);
+            }
+        }
+        
+        async function scanTemplateFolder(templateFolder) {
+            try {
+                // Scan for PDF templates folder
+                const pdfFolderQuery = `'${templateFolder.id}' in parents and name='PDF_Templates' and mimeType='application/vnd.google-apps.folder' and trashed=false`;
+                const pdfFolderResponse = await gapi.client.drive.files.list({ q: pdfFolderQuery });
+                
+                // Scan for timesheet files
+                const timesheetQuery = `'${templateFolder.id}' in parents and (name contains 'Timesheet' or name contains 'timesheet') and trashed=false`;
+                const timesheetResponse = await gapi.client.drive.files.list({ q: timesheetQuery });
+                
+                // Get PDF files if PDF folder exists
+                let pdfFiles = [];
+                if (pdfFolderResponse.result.files && pdfFolderResponse.result.files.length > 0) {
+                    const pdfFolderId = pdfFolderResponse.result.files[0].id;
+                    const pdfFilesQuery = `'${pdfFolderId}' in parents and mimeType='application/pdf' and trashed=false`;
+                    const pdfFilesResponse = await gapi.client.drive.files.list({ q: pdfFilesQuery });
+                    pdfFiles = pdfFilesResponse.result.files || [];
+                }
+                
+                const template = {
+                    name: templateFolder.name,
+                    created: templateFolder.createdTime,
+                    driveFolderId: templateFolder.id,
+                    driveStructure: {
+                        templateFolder: templateFolder.id,
+                        pdfTemplatesFolder: pdfFolderResponse.result.files?.[0]?.id || null
+                    },
+                    pdfFiles: pdfFiles,
+                    timesheetFile: timesheetResponse.result.files?.[0] || null,
+                    baseFolder: 'Scanned from Google Drive'
+                };
+                
+                console.log(`Found template: ${template.name}, PDFs: ${pdfFiles.length}, Timesheet: ${template.timesheetFile ? 'Yes' : 'No'}`);
+                return template;
+                
+            } catch (error) {
+                console.error(`Error scanning template folder ${templateFolder.name}:`, error);
+                return null;
+            }
+        }
+        
+        async function scanActiveProjectsFolders() {
+            try {
+                // Find KDT_Active_Projects folder
+                const activeQuery = `name='KDT_Active_Projects' and mimeType='application/vnd.google-apps.folder' and trashed=false`;
+                const activeResponse = await gapi.client.drive.files.list({ q: activeQuery });
+                
+                if (!activeResponse.result.files || activeResponse.result.files.length === 0) {
+                    console.log('No KDT_Active_Projects folder found');
+                    return;
+                }
+                
+                const activeFolderId = activeResponse.result.files[0].id;
+                
+                // Get all project subfolders
+                const projectFoldersQuery = `'${activeFolderId}' in parents and mimeType='application/vnd.google-apps.folder' and trashed=false`;
+                const projectFoldersResponse = await gapi.client.drive.files.list({ q: projectFoldersQuery });
+                
+                for (const projectFolder of projectFoldersResponse.result.files || []) {
+                    const project = await scanActiveProjectFolder(projectFolder);
+                    if (project) {
+                        activeProjects.push(project);
+                    }
+                }
+                
+            } catch (error) {
+                console.error('Error scanning active projects folders:', error);
+            }
+        }
+        
+        async function scanActiveProjectFolder(projectFolder) {
+            try {
+                // Scan for timesheets folder and files
+                const timesheetsFolderQuery = `'${projectFolder.id}' in parents and name='Timesheets' and mimeType='application/vnd.google-apps.folder' and trashed=false`;
+                const timesheetsFolderResponse = await gapi.client.drive.files.list({ q: timesheetsFolderQuery });
+                
+                // Scan for PDFs folder
+                const pdfFolderQuery = `'${projectFolder.id}' in parents and name='Generated_PDFs' and mimeType='application/vnd.google-apps.folder' and trashed=false`;
+                const pdfFolderResponse = await gapi.client.drive.files.list({ q: pdfFolderQuery });
+                
+                let timesheetFiles = [];
+                if (timesheetsFolderResponse.result.files && timesheetsFolderResponse.result.files.length > 0) {
+                    const timesheetsFolderId = timesheetsFolderResponse.result.files[0].id;
+                    const timesheetFilesQuery = `'${timesheetsFolderId}' in parents and mimeType='application/vnd.google-apps.spreadsheet' and trashed=false`;
+                    const timesheetFilesResponse = await gapi.client.drive.files.list({ q: timesheetFilesQuery });
+                    timesheetFiles = timesheetFilesResponse.result.files || [];
+                }
+                
+                const project = {
+                    name: projectFolder.name,
+                    created: projectFolder.createdTime,
+                    driveFolderId: projectFolder.id,
+                    driveStructure: {
+                        projectFolder: projectFolder.id,
+                        timesheetsFolder: timesheetsFolderResponse.result.files?.[0]?.id || null,
+                        generatedPDFsFolder: pdfFolderResponse.result.files?.[0]?.id || null
+                    },
+                    timesheetFiles: timesheetFiles,
+                    isActiveProject: true
+                };
+                
+                console.log(`Found active project: ${project.name}, Timesheets: ${timesheetFiles.length}`);
+                return project;
+                
+            } catch (error) {
+                console.error(`Error scanning active project folder ${projectFolder.name}:`, error);
+                return null;
+            }
         }
         
         body {
@@ -479,46 +928,21 @@
                     </div>
                     
                     <div style="margin-bottom: 20px;">
-                        <label style="display: block; font-weight: 600; margin-bottom: 8px;">Timesheet Template:</label>
-                        <div class="file-input" id="timesheetInput">
-                            <input type="file" id="timesheetFile" accept=".xlsx,.xls" />
-                            <label for="timesheetFile" class="file-input-label">
-                                <div style="font-size: 2rem; margin-bottom: 10px;">📊</div>
-                                <div><strong>Upload KDT Timesheet Template (Excel format)</strong></div>
-                                <div style="color: #a0aec0; margin-top: 5px;">Or drag and drop here</div>
-                            </label>
+                        <div style="background: #f8f9fa; padding: 20px; border-radius: 8px; border: 2px solid #5a6c57;">
+                            <h4>Manual Template Setup Instructions</h4>
+                            <p style="margin: 10px 0; color: #495057;">After creating the template folder structure, manually upload files to Google Drive:</p>
+                            <ol style="margin: 10px 0; padding-left: 20px; color: #495057;">
+                                <li>Upload PDF templates (CTR, Shift Ticket) to: <code>KDT_Company_Templates/[Template Name]/PDF_Templates/</code></li>
+                                <li>Upload/create Google Sheet timesheet in: <code>KDT_Company_Templates/[Template Name]/</code></li>
+                                <li>Name the timesheet: <code>[Template Name]_Timesheet</code></li>
+                            </ol>
+                            <p style="margin: 10px 0; color: #6c757d; font-style: italic;">This manual approach ensures reliable file management and easier testing.</p>
                         </div>
                     </div>
-                    
-                    <div id="timesheetPreview"></div>
-                </div>
-                
-                <!-- PDF Template Upload -->
-                <div class="step" id="pdfTemplateStep" style="display: none;">
-                    <div class="step-title">
-                        <div class="step-number">📋</div>
-                        Upload PDF Templates
-                    </div>
-                    
-                    <div style="display: grid; grid-template-columns: 1fr auto; gap: 15px; margin-bottom: 20px;">
-                        <div class="file-input" id="pdfInput">
-                            <input type="file" id="pdfFile" accept=".pdf" multiple />
-                            <label for="pdfFile" class="file-input-label">
-                                <div style="font-size: 2rem; margin-bottom: 10px;">📋</div>
-                                <div><strong>Upload CTR and Shift Ticket PDF Templates</strong></div>
-                                <div style="color: #a0aec0; margin-top: 5px;">Or drag and drop here</div>
-                            </label>
-                        </div>
-                        <button onclick="clearAllForms()" class="btn-danger" style="height: fit-content; width: auto; padding: 15px 20px;">
-                            Clear All
-                        </button>
-                    </div>
-                    
-                    <div id="pdfFormsPreview"></div>
                     
                     <div style="margin-top: 20px;">
                         <button onclick="saveProject()" class="btn-success">
-                            Save Template & Create Folders
+                            Create Template Folders
                         </button>
                         <button onclick="cancelEdit()" class="btn-warning" style="margin-left: 10px;">
                             Cancel
@@ -582,10 +1006,17 @@
                         Generate PDFs: <span id="currentFireName">Fire Name</span>
                     </div>
                     
-                    <div style="margin-bottom: 20px;">
-                        <button onclick="refreshProjectData()" class="btn-info" style="width: auto; padding: 10px 20px;">
+                    <div style="display: grid; grid-template-columns: 1fr auto; gap: 15px; margin-bottom: 20px;">
+                        <button onclick="refreshProjectData()" class="btn-info">
                             🔄 Refresh Data from Google Sheets
                         </button>
+                        <button onclick="createAdditionalTimesheet()" class="btn-success" style="width: auto; padding: 10px 20px;">
+                            📋 Create Additional Timesheet
+                        </button>
+                    </div>
+                    
+                    <div id="timesheetsList" style="margin-bottom: 20px;">
+                        <!-- Available timesheets will appear here -->
                     </div>
                     
                     <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 20px; margin-bottom: 20px;">
@@ -642,6 +1073,7 @@
         let tokenClient;
         let currentMode = 'admin';
         let gapiLoaded = false;
+        let activeProjects = [];
         
         // Google API configuration - UPDATED SCOPE FOR FULL DRIVE ACCESS
         const CLIENT_ID = '366876817577-1va8eaifrnvu76dl15chgvcqlvcc6af0.apps.googleusercontent.com';
@@ -652,7 +1084,6 @@
             console.log('Page loaded, initializing...');
             initializeGoogleAPI();
             setupEventListeners();
-            loadProjects();
             showStatus('KDT Auto-Generator ready! Connect to Google Drive to start.', 'info');
         });
         
@@ -687,6 +1118,9 @@
                             document.getElementById('authorizeBtn').innerHTML = '✅ Connected to Google Drive';
                             document.getElementById('authorizeBtn').disabled = true;
                             showAuthStatus('Successfully connected to Google Drive!', 'success');
+                            
+                            // Load projects from Google Drive after authentication
+                            loadProjectsFromGoogleDrive();
                         },
                     });
                     
@@ -722,15 +1156,6 @@
         
         function setupEventListeners() {
             console.log('Setting up event listeners...');
-            const timesheetFile = document.getElementById('timesheetFile');
-            const pdfFile = document.getElementById('pdfFile');
-            
-            if (timesheetFile) {
-                timesheetFile.addEventListener('change', handleTimesheetUpload);
-            }
-            if (pdfFile) {
-                pdfFile.addEventListener('change', handlePDFUpload);
-            }
             
             // Add input change listeners for project name and base folder
             const projectNameInput = document.getElementById('projectNameInput');
@@ -882,16 +1307,23 @@
             }
         }
         
-        // Project Management Functions - UPDATED to include folder creation
-        function loadProjects() {
-            try {
-                const savedProjects = localStorage.getItem('kdtProjects');
-                projects = savedProjects ? JSON.parse(savedProjects) : [];
+        // NEW: Load projects from Google Drive instead of localStorage  
+        async function loadProjectsFromGoogleDrive() {
+            showStatus('Loading projects from Google Drive...', 'info');
+            await scanGoogleDriveForProjects();
+            renderProjectList();
+            if (currentMode === 'user') {
+                loadUserProjects();
+            }
+            showStatus('Projects loaded from Google Drive!', 'success');
+        }
+        
+        // Project Management Functions - UPDATED to use Google Drive scanning
+        async function loadProjects() {
+            if (isAuthenticated && gapiLoaded) {
+                await loadProjectsFromGoogleDrive();
+            } else {
                 renderProjectList();
-            } catch (error) {
-                console.error('Error loading projects:', error);
-                projects = [];
-                showStatus('Error loading projects from storage.', 'error');
             }
         }
         
@@ -900,12 +1332,15 @@
             if (!container) return;
             
             if (projects.length === 0) {
-                container.innerHTML = '<p style="color: #718096; text-align: center; padding: 40px;">No templates yet. Create your first template!</p>';
+                container.innerHTML = '<p style="color: #718096; text-align: center; padding: 40px;">No templates found. Create templates or check Google Drive.</p>';
                 return;
             }
             
             let html = '';
             projects.forEach((project, index) => {
+                const pdfCount = project.pdfFiles ? project.pdfFiles.length : 0;
+                const hasTimesheet = project.timesheetFile ? '✅' : '❌';
+                
                 html += `
                     <div class="project-card" onclick="loadProject(${index})">
                         <h4>${project.name}</h4>
@@ -913,17 +1348,17 @@
                             Created: ${new Date(project.created).toLocaleDateString()}
                         </p>
                         <p style="color: #718096;">
-                            Company: ${project.baseFolder || 'Not set'}
+                            PDFs: ${pdfCount} | Timesheet: ${hasTimesheet}
                         </p>
                         <p style="color: #718096; font-size: 0.8rem;">
-                            Drive Folder: ${project.driveFolderId ? '✅ Created' : '❌ Not created'}
+                            Source: Google Drive
                         </p>
                         <div style="margin-top: 15px; display: flex; gap: 10px;">
                             <button onclick="event.stopPropagation(); loadProject(${index})" class="btn-warning" style="width: auto; padding: 8px 15px; font-size: 0.9rem;">
-                                Edit
+                                View
                             </button>
-                            <button onclick="event.stopPropagation(); deleteProject(${index})" class="btn-danger" style="width: auto; padding: 8px 15px; font-size: 0.9rem;">
-                                Delete
+                            <button onclick="event.stopPropagation(); refreshProjects()" class="btn-info" style="width: auto; padding: 8px 15px; font-size: 0.9rem;">
+                                Refresh
                             </button>
                         </div>
                     </div>
@@ -933,13 +1368,16 @@
             container.innerHTML = html;
         }
         
+        async function refreshProjects() {
+            showStatus('Refreshing projects from Google Drive...', 'info');
+            await loadProjectsFromGoogleDrive();
+        }
+        
         function createNewProject() {
             currentProject = {
                 name: '',
                 created: new Date().toISOString(),
                 baseFolder: '',
-                timesheetData: null,
-                pdfTemplates: [],
                 driveFolderId: null
             };
             
@@ -947,8 +1385,6 @@
             document.getElementById('currentProjectName').textContent = 'New Template';
             document.getElementById('projectNameInput').value = '';
             document.getElementById('baseFolderInput').value = '';
-            document.getElementById('timesheetPreview').innerHTML = '';
-            document.getElementById('pdfTemplateStep').style.display = 'none';
             
             // Scroll to project setup
             document.getElementById('projectSetupStep').scrollIntoView({ behavior: 'smooth' });
@@ -1015,10 +1451,7 @@
         
         function cancelEdit() {
             currentProject = null;
-            timesheetData = null;
-            pdfTemplates = [];
             document.getElementById('projectSetupStep').style.display = 'none';
-            document.getElementById('pdfTemplateStep').style.display = 'none';
             showStatus('Template editing cancelled.', 'info');
         }
         
@@ -1230,7 +1663,7 @@
             return new File([byteArray], filename, { type: 'application/pdf' });
         }
         
-        // UPDATED saveProject function to include folder creation
+        // SIMPLIFIED saveProject function - only creates folders
         function saveProject() {
             const projectName = document.getElementById('projectNameInput').value.trim();
             const baseFolder = document.getElementById('baseFolderInput').value.trim();
@@ -1240,94 +1673,39 @@
                 return;
             }
             
-            if (!timesheetData) {
-                showStatus('Please upload a timesheet first.', 'error');
-                return;
-            }
-            
-            if (!pdfTemplates || pdfTemplates.length === 0) {
-                showStatus('Please upload PDF templates first.', 'error');
-                return;
-            }
-            
             if (!isAuthenticated) {
                 showStatus('Please connect to Google Drive first.', 'error');
                 return;
             }
             
-            showStatus('Saving template and creating folders...', 'info');
+            showStatus('Creating template folders...', 'info');
             
-            // Store PDF template data as base64 for persistence
-            const templatePromises = pdfTemplates.map(template => {
-                return new Promise((resolve) => {
-                    const reader = new FileReader();
-                    reader.onload = function(e) {
-                        const arrayBuffer = e.target.result;
-                        const base64 = btoa(String.fromCharCode(...new Uint8Array(arrayBuffer)));
-                        resolve({
-                            name: template.name,
-                            type: template.type,
-                            data: base64
-                        });
-                    };
-                    reader.readAsArrayBuffer(template.file);
-                });
-            });
-            
-            Promise.all(templatePromises).then(async (templateData) => {
-                try {
-                    // Create Google Drive folders
-                    const folderStructure = await createProjectFolders(projectName, baseFolder);
-                    
-                    currentProject.name = projectName;
-                    currentProject.baseFolder = baseFolder;
-                    currentProject.pdfTemplateData = templateData;
-                    currentProject.updated = new Date().toISOString();
-                    currentProject.driveFolderId = folderStructure.templateFolder;
-                    currentProject.driveStructure = folderStructure;
-                    
-                    const existingIndex = projects.findIndex(p => p.name === projectName);
-                    if (existingIndex >= 0) {
-                        projects[existingIndex] = currentProject;
-                    } else {
-                        projects.push(currentProject);
-                    }
-                    
-                    localStorage.setItem('kdtProjects', JSON.stringify(projects));
-                    renderProjectList();
-                    
-                    showStatus(`Template "${projectName}" saved and Google Drive folders created successfully!`, 'success');
-                    
-                    // Reset form
-                    document.getElementById('projectSetupStep').style.display = 'none';
-                    document.getElementById('pdfTemplateStep').style.display = 'none';
-                    currentProject = null;
-                    timesheetData = null;
-                    pdfTemplates = [];
-                } catch (folderError) {
-                    console.error('Folder creation error:', folderError);
-                    // Save project locally even if folder creation fails
-                    currentProject.name = projectName;
-                    currentProject.baseFolder = baseFolder;
-                    currentProject.pdfTemplateData = templateData;
-                    currentProject.updated = new Date().toISOString();
-                    currentProject.driveFolderId = null; // Mark as failed
-                    
-                    const existingIndex = projects.findIndex(p => p.name === projectName);
-                    if (existingIndex >= 0) {
-                        projects[existingIndex] = currentProject;
-                    } else {
-                        projects.push(currentProject);
-                    }
-                    
-                    localStorage.setItem('kdtProjects', JSON.stringify(projects));
-                    renderProjectList();
-                    
-                    showStatus(`Template "${projectName}" saved locally, but Google Drive folder creation failed: ${folderError.message}`, 'error');
+            // Create Google Drive folders only
+            createProjectFolders(projectName, baseFolder).then((folderStructure) => {
+                currentProject.name = projectName;
+                currentProject.baseFolder = baseFolder;
+                currentProject.updated = new Date().toISOString();
+                currentProject.driveFolderId = folderStructure.templateFolder;
+                currentProject.driveStructure = folderStructure;
+                
+                const existingIndex = projects.findIndex(p => p.name === projectName);
+                if (existingIndex >= 0) {
+                    projects[existingIndex] = currentProject;
+                } else {
+                    projects.push(currentProject);
                 }
+                
+                localStorage.setItem('kdtProjects', JSON.stringify(projects));
+                renderProjectList();
+                
+                showStatus(`Template "${projectName}" folders created successfully! Now manually upload files to Google Drive.`, 'success');
+                
+                // Reset form
+                document.getElementById('projectSetupStep').style.display = 'none';
+                currentProject = null;
             }).catch(error => {
-                console.error('Error saving project:', error);
-                showStatus('Error saving template: ' + error.message, 'error');
+                console.error('Folder creation error:', error);
+                showStatus('Error creating folders: ' + error.message, 'error');
             });
         }
         
@@ -1653,22 +2031,29 @@
         
         function generateCTRPDF(fireName, userName) {
             return new Promise((resolve, reject) => {
-                const ctrTemplate = pdfTemplates.find(t => t.type === 'ctr');
+                // Find CTR template from current template's PDF files
+                const ctrTemplate = findPDFTemplate('ctr');
                 if (!ctrTemplate) {
                     reject(new Error('CTR template not found'));
                     return;
                 }
                 
-                const reader = new FileReader();
-                reader.onload = async function(e) {
+                // Download and process the PDF template
+                downloadPDFTemplate(ctrTemplate.id).then(async (pdfData) => {
                     try {
-                        const pdfDoc = await PDFLib.PDFDocument.load(e.target.result);
+                        const pdfDoc = await PDFLib.PDFDocument.load(pdfData);
                         const form = pdfDoc.getForm();
                         const fields = form.getFields();
                         
                         const dateStr = selectedDay.date instanceof Date ? 
                             selectedDay.date.toLocaleDateString() : 
                             new Date(selectedDay.date).toLocaleDateString();
+                        
+                        // Format date for filename (MMDDYYYY)
+                        const dateObj = selectedDay.date instanceof Date ? selectedDay.date : new Date(selectedDay.date);
+                        const fileDate = (dateObj.getMonth() + 1).toString().padStart(2, '0') + 
+                                       dateObj.getDate().toString().padStart(2, '0') + 
+                                       dateObj.getFullYear();
                         
                         const dayEmployees = timesheetData.employees.filter(emp => {
                             const worked = emp.rowData[selectedDay.workedCol];
@@ -1694,12 +2079,10 @@
                                 } else if (fieldName.includes('date')) {
                                     field.setText(dateStr);
                                 } else if (fieldName.includes('crew number')) {
-                                    // Extract RO number from timesheet if available
                                     const roNumber = timesheetData.rawData[59] && timesheetData.rawData[59][11] ? 
                                         timesheetData.rawData[59][11] : 'RO_12345';
                                     field.setText(roNumber);
                                 } else if (fieldName.includes('fire number')) {
-                                    // Extract incident number from timesheet if available
                                     const incidentNumber = timesheetData.rawData[58] && timesheetData.rawData[58][11] ? 
                                         timesheetData.rawData[58][11] : 'Incident_12345';
                                     field.setText(incidentNumber);
@@ -1709,12 +2092,10 @@
                             }
                         });
                         
-                        // Fill employee data - map to available fields
+                        // Fill employee data
                         dayEmployees.forEach((emp, index) => {
-                            // Convert classification to ACL title
                             const aclClassification = classificationMap[emp.classification] || emp.classification;
                             
-                            // Try to find fields for this employee
                             let nameField = null;
                             let classField = null;
                             let dateField = null;
@@ -1722,7 +2103,6 @@
                             fields.forEach(field => {
                                 const fieldName = field.getName().toLowerCase();
                                 
-                                // Look for field patterns like "text1", "text2", etc.
                                 if (fieldName.includes(`${index + 1}`) || fieldName.includes(`_${index + 1}`)) {
                                     if (fieldName.includes('name') || (!fieldName.includes('class') && !fieldName.includes('date'))) {
                                         nameField = field;
@@ -1734,7 +2114,6 @@
                                 }
                             });
                             
-                            // Fill the fields if found
                             if (nameField) {
                                 try {
                                     nameField.setText(emp.name);
@@ -1760,7 +2139,7 @@
                             }
                         });
                         
-                        // Fill any remaining fields with placeholders
+                        // Fill remaining fields with placeholders
                         for (let i = dayEmployees.length; i < 20; i++) {
                             fields.forEach(field => {
                                 const fieldName = field.getName().toLowerCase();
@@ -1779,14 +2158,16 @@
                         }
                         
                         const pdfBytes = await pdfDoc.save();
-                        const filename = `${fireName}_${userName}_CTR_${dateStr.replace(/\//g, '-')}.pdf`;
+                        const filename = `${fireName}_CTR_${fileDate}.pdf`;
+                        
+                        // Save to user's Generated_PDFs folder
+                        await savePDFToGoogleDrive(pdfBytes, filename);
                         downloadPDF(pdfBytes, filename);
                         resolve();
                     } catch (error) {
                         reject(error);
                     }
-                };
-                reader.readAsArrayBuffer(ctrTemplate.file);
+                }).catch(reject);
             });
         }
         
