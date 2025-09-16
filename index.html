@@ -643,7 +643,7 @@
         let currentMode = 'admin';
         let gapiLoaded = false;
         
-        // Google API configuration - UPDATED SCOPE
+        // Google API configuration - UPDATED SCOPE FOR FULL DRIVE ACCESS
         const CLIENT_ID = '366876817577-1va8eaifrnvu76dl15chgvcqlvcc6af0.apps.googleusercontent.com';
         const SCOPES = 'https://www.googleapis.com/auth/spreadsheets https://www.googleapis.com/auth/drive';
         
@@ -660,14 +660,14 @@
             console.log('Initializing Google API...');
             showAuthStatus('Loading Google APIs...', 'info');
             
-            // Load the Google API client
+            // Load the Google API client for Drive API
             if (typeof gapi !== 'undefined') {
                 gapi.load('client', initializeGapiClient);
             } else {
                 setTimeout(initializeGoogleAPI, 500);
             }
             
-            // Use a different approach to check for Google API availability
+            // Initialize OAuth client
             if (typeof google !== 'undefined' && google.accounts) {
                 console.log('Google OAuth APIs loaded');
                 try {
@@ -696,7 +696,6 @@
                     showAuthStatus('Error initializing Google APIs.', 'error');
                 }
             } else {
-                // If Google API isn't available yet, try again after a delay
                 setTimeout(initializeGoogleAPI, 500);
             }
         }
@@ -711,6 +710,11 @@
                 });
                 gapiLoaded = true;
                 console.log('GAPI client initialized');
+                
+                // Set token if already authenticated
+                if (accessToken) {
+                    gapi.client.setToken({access_token: accessToken});
+                }
             } catch (error) {
                 console.error('Error initializing GAPI client:', error);
             }
@@ -792,8 +796,8 @@
             
             try {
                 // Create main KDT folder structure
-                const kdtTemplatesFolder = await createFolder('KDT_Company_Templates', null);
-                const kdtActiveFolder = await createFolder('KDT_Active_Projects', null);
+                const kdtTemplatesFolder = await findOrCreateFolder('KDT_Company_Templates', null);
+                const kdtActiveFolder = await findOrCreateFolder('KDT_Active_Projects', null);
                 
                 // Create template folder
                 const templateFolder = await createFolder(projectName, kdtTemplatesFolder.id);
@@ -809,23 +813,6 @@
                 console.error('Error creating project folders:', error);
                 throw error;
             }
-        }
-        
-        async function createFolder(name, parentId) {
-            const metadata = {
-                name: name,
-                mimeType: 'application/vnd.google-apps.folder'
-            };
-            
-            if (parentId) {
-                metadata.parents = [parentId];
-            }
-            
-            const response = await gapi.client.drive.files.create({
-                resource: metadata
-            });
-            
-            return response.result;
         }
         
         async function createActiveProjectFolders(projectName, templateFolderId) {
@@ -853,6 +840,23 @@
             }
         }
         
+        async function createFolder(name, parentId) {
+            const metadata = {
+                name: name,
+                mimeType: 'application/vnd.google-apps.folder'
+            };
+            
+            if (parentId) {
+                metadata.parents = [parentId];
+            }
+            
+            const response = await gapi.client.drive.files.create({
+                resource: metadata
+            });
+            
+            return response.result;
+        }
+        
         async function findOrCreateFolder(name, parentId) {
             try {
                 // Search for existing folder
@@ -877,3 +881,1023 @@
                 return await createFolder(name, parentId);
             }
         }
+        
+        // Project Management Functions - UPDATED to include folder creation
+        function loadProjects() {
+            try {
+                const savedProjects = localStorage.getItem('kdtProjects');
+                projects = savedProjects ? JSON.parse(savedProjects) : [];
+                renderProjectList();
+            } catch (error) {
+                console.error('Error loading projects:', error);
+                projects = [];
+                showStatus('Error loading projects from storage.', 'error');
+            }
+        }
+        
+        function renderProjectList() {
+            const container = document.getElementById('projectList');
+            if (!container) return;
+            
+            if (projects.length === 0) {
+                container.innerHTML = '<p style="color: #718096; text-align: center; padding: 40px;">No templates yet. Create your first template!</p>';
+                return;
+            }
+            
+            let html = '';
+            projects.forEach((project, index) => {
+                html += `
+                    <div class="project-card" onclick="loadProject(${index})">
+                        <h4>${project.name}</h4>
+                        <p style="color: #718096; margin: 10px 0;">
+                            Created: ${new Date(project.created).toLocaleDateString()}
+                        </p>
+                        <p style="color: #718096;">
+                            Company: ${project.baseFolder || 'Not set'}
+                        </p>
+                        <p style="color: #718096; font-size: 0.8rem;">
+                            Drive Folder: ${project.driveFolderId ? '✅ Created' : '❌ Not created'}
+                        </p>
+                        <div style="margin-top: 15px; display: flex; gap: 10px;">
+                            <button onclick="event.stopPropagation(); loadProject(${index})" class="btn-warning" style="width: auto; padding: 8px 15px; font-size: 0.9rem;">
+                                Edit
+                            </button>
+                            <button onclick="event.stopPropagation(); deleteProject(${index})" class="btn-danger" style="width: auto; padding: 8px 15px; font-size: 0.9rem;">
+                                Delete
+                            </button>
+                        </div>
+                    </div>
+                `;
+            });
+            
+            container.innerHTML = html;
+        }
+        
+        function createNewProject() {
+            currentProject = {
+                name: '',
+                created: new Date().toISOString(),
+                baseFolder: '',
+                timesheetData: null,
+                pdfTemplates: [],
+                driveFolderId: null
+            };
+            
+            document.getElementById('projectSetupStep').style.display = 'block';
+            document.getElementById('currentProjectName').textContent = 'New Template';
+            document.getElementById('projectNameInput').value = '';
+            document.getElementById('baseFolderInput').value = '';
+            document.getElementById('timesheetPreview').innerHTML = '';
+            document.getElementById('pdfTemplateStep').style.display = 'none';
+            
+            // Scroll to project setup
+            document.getElementById('projectSetupStep').scrollIntoView({ behavior: 'smooth' });
+        }
+        
+        function updateProjectName() {
+            const name = document.getElementById('projectNameInput').value;
+            document.getElementById('currentProjectName').textContent = name || 'New Template';
+        }
+        
+        function updateBaseFolder() {
+            // This function can be expanded if needed
+        }
+        
+        function loadProject(index) {
+            if (index < 0 || index >= projects.length) {
+                showStatus('Invalid project index.', 'error');
+                return;
+            }
+            
+            currentProject = projects[index];
+            document.getElementById('projectSetupStep').style.display = 'block';
+            document.getElementById('currentProjectName').textContent = currentProject.name;
+            document.getElementById('projectNameInput').value = currentProject.name;
+            document.getElementById('baseFolderInput').value = currentProject.baseFolder || '';
+            
+            if (currentProject.timesheetData) {
+                timesheetData = currentProject.timesheetData;
+                displayTimesheetPreview();
+                document.getElementById('pdfTemplateStep').style.display = 'block';
+            }
+            
+            if (currentProject.pdfTemplateData) {
+                pdfTemplates = currentProject.pdfTemplateData.map(templateData => ({
+                    name: templateData.name,
+                    type: templateData.type,
+                    file: base64ToFile(templateData.data, templateData.name)
+                }));
+                displayPDFPreview();
+            }
+            
+            // Scroll to project setup
+            document.getElementById('projectSetupStep').scrollIntoView({ behavior: 'smooth' });
+        }
+        
+        function deleteProject(index) {
+            if (index < 0 || index >= projects.length) {
+                showStatus('Invalid project index.', 'error');
+                return;
+            }
+            
+            if (confirm('Are you sure you want to delete this template? This action cannot be undone.')) {
+                projects.splice(index, 1);
+                try {
+                    localStorage.setItem('kdtProjects', JSON.stringify(projects));
+                    renderProjectList();
+                    showStatus('Template deleted successfully.', 'success');
+                } catch (error) {
+                    console.error('Error saving projects:', error);
+                    showStatus('Error saving project changes.', 'error');
+                }
+            }
+        }
+        
+        function cancelEdit() {
+            currentProject = null;
+            timesheetData = null;
+            pdfTemplates = [];
+            document.getElementById('projectSetupStep').style.display = 'none';
+            document.getElementById('pdfTemplateStep').style.display = 'none';
+            showStatus('Template editing cancelled.', 'info');
+        }
+        
+        // Timesheet Processing - PRESERVED FROM ORIGINAL
+        function handleTimesheetUpload(event) {
+            const file = event.target.files[0];
+            if (!file) return;
+            
+            showStatus('Processing timesheet...', 'info');
+            
+            const reader = new FileReader();
+            reader.onload = function(e) {
+                try {
+                    const workbook = XLSX.read(e.target.result, { type: 'array', cellDates: true });
+                    const worksheet = workbook.Sheets[workbook.SheetNames[0]];
+                    const jsonData = XLSX.utils.sheet_to_json(worksheet, { header: 1 });
+                    
+                    // Process the timesheet data in a way that avoids recursion
+                    setTimeout(() => {
+                        try {
+                            timesheetData = processTimesheetData(jsonData);
+                            currentProject.timesheetData = timesheetData;
+                            
+                            displayTimesheetPreview();
+                            document.getElementById('pdfTemplateStep').style.display = 'block';
+                            
+                            showStatus('Timesheet processed successfully!', 'success');
+                        } catch (error) {
+                            console.error('Error processing timesheet data:', error);
+                            showStatus('Error processing timesheet: ' + error.message, 'error');
+                        }
+                    }, 0);
+                } catch (error) {
+                    console.error('Error parsing timesheet:', error);
+                    showStatus('Error parsing timesheet: ' + error.message, 'error');
+                }
+            };
+            reader.onerror = function(error) {
+                console.error('Error reading file:', error);
+                showStatus('Error reading file: ' + error.message, 'error');
+            };
+            reader.readAsArrayBuffer(file);
+        }
+        
+        function processTimesheetData(jsonData) {
+            // Add a limit to prevent infinite loops
+            const MAX_ROWS = 1000;
+            
+            const fireName = jsonData[0] && jsonData[0][1] ? jsonData[0][1] : 'Unknown Fire';
+            const dateRow = jsonData[3];
+            const dates = [];
+            
+            for (let i = 4; i < dateRow.length && i < MAX_ROWS; i += 2) {
+                if (dateRow[i] && dateRow[i + 1]) {
+                    dates.push({
+                        dayName: dateRow[i],
+                        date: dateRow[i + 1],
+                        workedCol: i,
+                        milesCol: i + 1
+                    });
+                }
+            }
+            
+            const employees = [];
+            for (let i = 5; i < jsonData.length && i < MAX_ROWS; i++) {
+                const row = jsonData[i];
+                if (!row || !row[0] || typeof row[0] !== 'string') continue;
+                
+                const name = row[0].trim();
+                if (!name || 
+                    name.toLowerCase().includes('total') || 
+                    name.toLowerCase().includes('combined') ||
+                    name === 'GUARDS' || name === 'MANAGER' || name === 'SUPERVISORS' ||
+                    name.toLowerCase().includes('charge') ||
+                    name.toLowerCase().includes('daily') ||
+                    name === '') {
+                    continue;
+                }
+                
+                let classification = 'Guard';
+                // Limit the backward search to prevent excessive looping
+                const searchLimit = Math.max(0, i - 50); // Look back at most 50 rows
+                for (let j = i - 1; j >= searchLimit; j--) {
+                    const prevRow = jsonData[j];
+                    if (prevRow && prevRow[0]) {
+                        const prevName = String(prevRow[0]).toLowerCase();
+                        if (prevName.includes('manager')) {
+                            classification = 'Manager';
+                            break;
+                        } else if (prevName.includes('supervisor')) {
+                            classification = 'Supervisor';
+                            break;
+                        } else if (prevName.includes('guard')) {
+                            classification = 'Guard';
+                            break;
+                        }
+                    }
+                }
+                
+                let hasData = false;
+                for (let col = 4; col < row.length && col < MAX_ROWS; col += 2) {
+                    if (row[col] && row[col] > 0) {
+                        hasData = true;
+                        break;
+                    }
+                }
+                
+                if (hasData) {
+                    employees.push({
+                        name: name,
+                        classification: classification,
+                        rowData: row
+                    });
+                }
+            }
+            
+            return {
+                fireName: fireName,
+                dates: dates,
+                employees: employees,
+                rawData: jsonData
+            };
+        }
+        
+        function displayTimesheetPreview() {
+            if (!timesheetData) return;
+            
+            const preview = document.getElementById('timesheetPreview');
+            const counts = { Guard: 0, Manager: 0, Supervisor: 0 };
+            timesheetData.employees.forEach(emp => {
+                counts[emp.classification]++;
+            });
+            
+            let html = `
+                <div style="background: #f8f9fa; padding: 20px; border-radius: 8px; margin: 20px 0;">
+                    <h4>Timesheet Preview</h4>
+                    <p><strong>Fire Name:</strong> ${timesheetData.fireName}</p>
+                    <p><strong>Dates Available:</strong> ${timesheetData.dates.length} days</p>
+                    <p><strong>Employees:</strong> ${timesheetData.employees.length} total</p>
+                    <div style="margin-top: 15px;">
+                        <strong>Employee Breakdown:</strong><br>
+            `;
+            
+            Object.entries(counts).forEach(([type, count]) => {
+                if (count > 0) {
+                    html += `${type}s: ${count} &nbsp;&nbsp;`;
+                }
+            });
+            
+            html += '</div></div>';
+            preview.innerHTML = html;
+        }
+        
+        // PDF Template Handling - PRESERVED FROM ORIGINAL
+        function handlePDFUpload(event) {
+            const files = Array.from(event.target.files);
+            if (!files.length) return;
+            
+            pdfTemplates = [];
+            files.forEach(file => {
+                pdfTemplates.push({
+                    name: file.name,
+                    file: file,
+                    type: file.name.toLowerCase().includes('ctr') ? 'ctr' : 
+                          file.name.toLowerCase().includes('shift') ? 'shift' : 'unknown'
+                });
+            });
+            
+            displayPDFPreview();
+        }
+        
+        function displayPDFPreview() {
+            const preview = document.getElementById('pdfFormsPreview');
+            if (pdfTemplates.length === 0) {
+                preview.innerHTML = '';
+                return;
+            }
+            
+            let html = '<div style="background: #f8f9fa; padding: 20px; border-radius: 8px;"><h4>PDF Templates</h4>';
+            pdfTemplates.forEach(template => {
+                html += `
+                    <div style="display: flex; justify-content: space-between; align-items: center; padding: 10px; background: white; border-radius: 6px; margin-bottom: 10px;">
+                        <div>
+                            <strong>${template.name}</strong>
+                            <div style="color: #718096; font-size: 0.9rem;">Type: ${template.type.toUpperCase()}</div>
+                        </div>
+                    </div>
+                `;
+            });
+            html += '</div>';
+            
+            preview.innerHTML = html;
+        }
+        
+        function clearAllForms() {
+            pdfTemplates = [];
+            document.getElementById('pdfFile').value = '';
+            displayPDFPreview();
+            showStatus('PDF templates cleared.', 'info');
+        }
+        
+        function base64ToFile(base64, filename) {
+            const byteCharacters = atob(base64);
+            const byteNumbers = new Array(byteCharacters.length);
+            for (let i = 0; i < byteCharacters.length; i++) {
+                byteNumbers[i] = byteCharacters.charCodeAt(i);
+            }
+            const byteArray = new Uint8Array(byteNumbers);
+            return new File([byteArray], filename, { type: 'application/pdf' });
+        }
+        
+        // UPDATED saveProject function to include folder creation
+        function saveProject() {
+            const projectName = document.getElementById('projectNameInput').value.trim();
+            const baseFolder = document.getElementById('baseFolderInput').value.trim();
+            
+            if (!projectName) {
+                showStatus('Please enter a template name.', 'error');
+                return;
+            }
+            
+            if (!timesheetData) {
+                showStatus('Please upload a timesheet first.', 'error');
+                return;
+            }
+            
+            if (!pdfTemplates || pdfTemplates.length === 0) {
+                showStatus('Please upload PDF templates first.', 'error');
+                return;
+            }
+            
+            if (!isAuthenticated) {
+                showStatus('Please connect to Google Drive first.', 'error');
+                return;
+            }
+            
+            showStatus('Saving template and creating folders...', 'info');
+            
+            // Store PDF template data as base64 for persistence
+            const templatePromises = pdfTemplates.map(template => {
+                return new Promise((resolve) => {
+                    const reader = new FileReader();
+                    reader.onload = function(e) {
+                        const arrayBuffer = e.target.result;
+                        const base64 = btoa(String.fromCharCode(...new Uint8Array(arrayBuffer)));
+                        resolve({
+                            name: template.name,
+                            type: template.type,
+                            data: base64
+                        });
+                    };
+                    reader.readAsArrayBuffer(template.file);
+                });
+            });
+            
+            Promise.all(templatePromises).then(async (templateData) => {
+                try {
+                    // Create Google Drive folders
+                    const folderStructure = await createProjectFolders(projectName, baseFolder);
+                    
+                    currentProject.name = projectName;
+                    currentProject.baseFolder = baseFolder;
+                    currentProject.pdfTemplateData = templateData;
+                    currentProject.updated = new Date().toISOString();
+                    currentProject.driveFolderId = folderStructure.templateFolder;
+                    currentProject.driveStructure = folderStructure;
+                    
+                    const existingIndex = projects.findIndex(p => p.name === projectName);
+                    if (existingIndex >= 0) {
+                        projects[existingIndex] = currentProject;
+                    } else {
+                        projects.push(currentProject);
+                    }
+                    
+                    localStorage.setItem('kdtProjects', JSON.stringify(projects));
+                    renderProjectList();
+                    
+                    showStatus(`Template "${projectName}" saved and Google Drive folders created successfully!`, 'success');
+                    
+                    // Reset form
+                    document.getElementById('projectSetupStep').style.display = 'none';
+                    document.getElementById('pdfTemplateStep').style.display = 'none';
+                    currentProject = null;
+                    timesheetData = null;
+                    pdfTemplates = [];
+                } catch (folderError) {
+                    console.error('Folder creation error:', folderError);
+                    // Save project locally even if folder creation fails
+                    currentProject.name = projectName;
+                    currentProject.baseFolder = baseFolder;
+                    currentProject.pdfTemplateData = templateData;
+                    currentProject.updated = new Date().toISOString();
+                    currentProject.driveFolderId = null; // Mark as failed
+                    
+                    const existingIndex = projects.findIndex(p => p.name === projectName);
+                    if (existingIndex >= 0) {
+                        projects[existingIndex] = currentProject;
+                    } else {
+                        projects.push(currentProject);
+                    }
+                    
+                    localStorage.setItem('kdtProjects', JSON.stringify(projects));
+                    renderProjectList();
+                    
+                    showStatus(`Template "${projectName}" saved locally, but Google Drive folder creation failed: ${folderError.message}`, 'error');
+                }
+            }).catch(error => {
+                console.error('Error saving project:', error);
+                showStatus('Error saving template: ' + error.message, 'error');
+            });
+        }
+        
+        // User Mode Functions - UPDATED for template/project separation
+        function loadUserProjects() {
+            const container = document.getElementById('userProjectList');
+            if (!container) return;
+            
+            if (projects.length === 0) {
+                container.innerHTML = '<p style="color: #718096; text-align: center; padding: 40px;">No templates available. Contact your administrator to create templates.</p>';
+                return;
+            }
+            
+            let html = '<h4>Available Templates</h4>';
+            projects.forEach((project, index) => {
+                html += `
+                    <div class="project-card" onclick="selectTemplate(${index})">
+                        <h4>📋 ${project.name}</h4>
+                        <p style="color: #718096; margin: 10px 0;">
+                            Template - ${project.timesheetData ? project.timesheetData.dates.length : 0} day format
+                        </p>
+                        <p style="color: #718096;">
+                            Company: ${project.baseFolder || 'Not set'}
+                        </p>
+                        <div class="progress-bar">
+                            <div class="progress-bar-fill" style="width: ${project.timesheetData && project.pdfTemplateData ? 100 : 50}%"></div>
+                        </div>
+                    </div>
+                `;
+            });
+            
+            // TODO: Add active projects list here when we implement Google Drive scanning
+            html += '<h4 style="margin-top: 30px;">Active Fire Projects</h4>';
+            html += '<p style="color: #718096; text-align: center; padding: 20px;">Loading active projects from Google Drive...</p>';
+            
+            container.innerHTML = html;
+        }
+        
+        function refreshUserProjects() {
+            showStatus('Refreshing projects...', 'info');
+            loadUserProjects();
+            // TODO: Add Google Drive scanning for active projects
+            showStatus('Projects refreshed!', 'success');
+        }
+        
+        function selectTemplate(index) {
+            if (index < 0 || index >= projects.length) {
+                showStatus('Invalid template selection.', 'error');
+                return;
+            }
+            
+            selectedTemplate = projects[index];
+            
+            document.getElementById('createProjectStep').style.display = 'block';
+            document.getElementById('newProjectName').value = '';
+            document.getElementById('projectCreatorName').value = '';
+            
+            showStatus(`Selected template: ${selectedTemplate.name}`, 'success');
+            
+            // Scroll to create project step
+            document.getElementById('createProjectStep').scrollIntoView({ behavior: 'smooth' });
+        }
+        
+        async function createUserProject() {
+            const projectName = document.getElementById('newProjectName').value.trim();
+            const creatorName = document.getElementById('projectCreatorName').value.trim();
+            
+            if (!projectName || !creatorName) {
+                showStatus('Please enter both fire name and your name.', 'error');
+                return;
+            }
+            
+            if (!selectedTemplate) {
+                showStatus('Please select a template first.', 'error');
+                return;
+            }
+            
+            if (!isAuthenticated) {
+                showStatus('Please connect to Google Drive first.', 'error');
+                return;
+            }
+            
+            showStatus('Creating project and folders...', 'info');
+            
+            try {
+                // Create Google Drive folders for the new project
+                const projectFolders = await createActiveProjectFolders(projectName, selectedTemplate.driveFolderId);
+                
+                // Create project instance data
+                const projectInstance = {
+                    name: projectName,
+                    templateId: selectedTemplate.name,
+                    creator: creatorName,
+                    created: new Date().toISOString(),
+                    driveStructure: projectFolders,
+                    timesheetData: null, // Will be loaded from Google Sheets
+                    pdfTemplates: selectedTemplate.pdfTemplateData
+                };
+                
+                // TODO: Save project instance info to Google Drive
+                // For now, we'll store it locally with a different key
+                const activeProjects = JSON.parse(localStorage.getItem('kdtActiveProjects') || '[]');
+                activeProjects.push(projectInstance);
+                localStorage.setItem('kdtActiveProjects', JSON.stringify(activeProjects));
+                
+                showStatus(`Project "${projectName}" created successfully! Folders created in Google Drive.`, 'success');
+                
+                // Switch to project workflow
+                currentProject = projectInstance;
+                selectedTemplate = null;
+                document.getElementById('createProjectStep').style.display = 'none';
+                document.getElementById('userWorkflow').style.display = 'block';
+                document.getElementById('currentFireName').textContent = projectName;
+                document.getElementById('fireNameInput').value = projectName;
+                document.getElementById('userNameInput').value = creatorName;
+                
+                // Scroll to workflow
+                document.getElementById('userWorkflow').scrollIntoView({ behavior: 'smooth' });
+                
+            } catch (error) {
+                console.error('Error creating project:', error);
+                showStatus('Error creating project: ' + error.message, 'error');
+            }
+        }
+        
+        function cancelProjectCreation() {
+            selectedTemplate = null;
+            document.getElementById('createProjectStep').style.display = 'none';
+            showStatus('Project creation cancelled.', 'info');
+        }
+        
+        function refreshProjectData() {
+            if (!currentProject) {
+                showStatus('No project selected.', 'error');
+                return;
+            }
+            
+            showStatus('Refreshing data from Google Sheets...', 'info');
+            
+            // TODO: Implement Google Sheets data loading
+            // For now, use the template's timesheet data
+            if (selectedTemplate && selectedTemplate.timesheetData) {
+                timesheetData = selectedTemplate.timesheetData;
+                displayUserDaySelector();
+                showStatus('Data refreshed from template!', 'success');
+            } else {
+                showStatus('No timesheet data available. Please upload timesheet to Google Drive.', 'error');
+            }
+        }
+        
+        function selectUserProject(index) {
+            // This function will be implemented when we add active project browsing
+            showStatus('Active project selection coming soon!', 'info');
+        }
+        
+        function displayUserDaySelector() {
+            if (!timesheetData || !timesheetData.dates) return;
+            
+            const container = document.getElementById('daySelector');
+            if (!container) return;
+            
+            let html = '<h4>Select a day to process:</h4><div class="day-grid">';
+            
+            timesheetData.dates.forEach((dateInfo, index) => {
+                const dateStr = dateInfo.date instanceof Date ? 
+                    dateInfo.date.toLocaleDateString() : 
+                    new Date(dateInfo.date).toLocaleDateString();
+                
+                const daySummary = calculateDaySummary(dateInfo);
+                
+                html += `
+                    <div class="day-card" onclick="selectDay(${index})" id="dayCard${index}">
+                        <h4>${dateInfo.dayName}</h4>
+                        <div>${dateStr}</div>
+                        <div class="stats">
+                            People: ${daySummary.totalPeople}<br>
+                            Miles: ${daySummary.totalMiles}
+                        </div>
+                    </div>
+                `;
+            });
+            
+            html += '</div>';
+            container.innerHTML = html;
+        }
+        
+        function calculateDaySummary(dateInfo) {
+            let totalPeople = 0;
+            let totalMiles = 0;
+            
+            timesheetData.employees.forEach(emp => {
+                const worked = emp.rowData[dateInfo.workedCol];
+                const miles = emp.rowData[dateInfo.milesCol] || 0;
+                
+                if (worked >= 8 && worked <= 16) {
+                    totalPeople++;
+                }
+                totalMiles += miles;
+            });
+            
+            return { totalPeople, totalMiles };
+        }
+        
+        function selectDay(index) {
+            if (!timesheetData.dates || index < 0 || index >= timesheetData.dates.length) {
+                showStatus('Invalid day selection.', 'error');
+                return;
+            }
+            
+            selectedDay = timesheetData.dates[index];
+            
+            // Update visual selection
+            document.querySelectorAll('.day-card').forEach(card => {
+                card.classList.remove('selected');
+            });
+            
+            const selectedCard = document.getElementById(`dayCard${index}`);
+            if (selectedCard) {
+                selectedCard.classList.add('selected');
+            }
+            
+            displaySelectedDayPreview();
+            document.getElementById('selectedDayPreview').style.display = 'block';
+            
+            // Scroll to preview
+            document.getElementById('selectedDayPreview').scrollIntoView({ behavior: 'smooth', block: 'start' });
+        }
+        
+        function displaySelectedDayPreview() {
+            if (!selectedDay) return;
+            
+            const dateStr = selectedDay.date instanceof Date ? 
+                selectedDay.date.toLocaleDateString() : 
+                new Date(selectedDay.date).toLocaleDateString();
+            
+            const dayEmployees = [];
+            timesheetData.employees.forEach(emp => {
+                const worked = emp.rowData[selectedDay.workedCol];
+                const miles = emp.rowData[selectedDay.milesCol] || 0;
+                
+                if (worked >= 8 && worked <= 16) {
+                    dayEmployees.push({
+                        name: emp.name,
+                        classification: emp.classification,
+                        worked: worked,
+                        miles: miles
+                    });
+                }
+            });
+            
+            const totalPeople = dayEmployees.length;
+            const totalMiles = dayEmployees.reduce((sum, emp) => sum + emp.miles, 0);
+            
+            const summaryHtml = `
+                <div style="background: #f8f9fa; padding: 15px; border-radius: 8px; margin: 15px 0;">
+                    <p><strong>Date:</strong> ${selectedDay.dayName} ${dateStr}</p>
+                    <p><strong>Total People Worked:</strong> ${totalPeople} days</p>
+                    <p><strong>Total Miles:</strong> ${totalMiles}</p>
+                    <p><strong>Contractor/Agency:</strong> Knight Division Tactical</p>
+                    <p><strong>Operator:</strong> KDT</p>
+                </div>
+            `;
+            
+            document.getElementById('summaryInfo').innerHTML = summaryHtml;
+        }
+        
+        function generatePDFs() {
+            if (!selectedDay) {
+                showStatus('Please select a day first.', 'error');
+                return;
+            }
+            
+            const fireName = document.getElementById('fireNameInput').value.trim();
+            const userName = document.getElementById('userNameInput').value.trim();
+            
+            if (!fireName || !userName) {
+                showStatus('Please enter both fire name and your name.', 'error');
+                return;
+            }
+            
+            const generateCTR = document.getElementById('generateCTR').checked;
+            const generateShift = document.getElementById('generateShift').checked;
+            
+            if (!generateCTR && !generateShift) {
+                showStatus('Please select at least one PDF to generate.', 'error');
+                return;
+            }
+            
+            showStatus('Generating PDFs...', 'info');
+            
+            // Disable generate button during processing
+            const generateBtn = document.getElementById('generateBtn');
+            if (generateBtn) {
+                generateBtn.disabled = true;
+                generateBtn.innerHTML = 'Generating...';
+            }
+            
+            const promises = [];
+            
+            if (generateCTR) {
+                promises.push(generateCTRPDF(fireName, userName));
+            }
+            
+            if (generateShift) {
+                promises.push(generateShiftTicketPDF(fireName, userName));
+            }
+            
+            Promise.all(promises).then(() => {
+                showStatus('PDFs generated and downloaded successfully!', 'success');
+                if (generateBtn) {
+                    generateBtn.disabled = false;
+                    generateBtn.innerHTML = 'Generate & Download PDFs';
+                }
+            }).catch(error => {
+                console.error('Error generating PDFs:', error);
+                showStatus('Error generating PDFs: ' + error.message, 'error');
+                if (generateBtn) {
+                    generateBtn.disabled = false;
+                    generateBtn.innerHTML = 'Generate & Download PDFs';
+                }
+            });
+        }
+        
+        function generateCTRPDF(fireName, userName) {
+            return new Promise((resolve, reject) => {
+                const ctrTemplate = pdfTemplates.find(t => t.type === 'ctr');
+                if (!ctrTemplate) {
+                    reject(new Error('CTR template not found'));
+                    return;
+                }
+                
+                const reader = new FileReader();
+                reader.onload = async function(e) {
+                    try {
+                        const pdfDoc = await PDFLib.PDFDocument.load(e.target.result);
+                        const form = pdfDoc.getForm();
+                        const fields = form.getFields();
+                        
+                        const dateStr = selectedDay.date instanceof Date ? 
+                            selectedDay.date.toLocaleDateString() : 
+                            new Date(selectedDay.date).toLocaleDateString();
+                        
+                        const dayEmployees = timesheetData.employees.filter(emp => {
+                            const worked = emp.rowData[selectedDay.workedCol];
+                            return worked >= 8 && worked <= 16;
+                        });
+                        
+                        // Map classification to ACL titles
+                        const classificationMap = {
+                            'Guard': 'ACL Liaison',
+                            'Manager': 'ACL Manager',
+                            'Supervisor': 'ACL Supervisor'
+                        };
+                        
+                        // Fill basic fields
+                        fields.forEach(field => {
+                            const fieldName = field.getName().toLowerCase();
+                            
+                            try {
+                                if (fieldName.includes('crew') || fieldName.includes('agency')) {
+                                    field.setText('Knight Division Tactical');
+                                } else if (fieldName.includes('fire') || fieldName.includes('incident')) {
+                                    field.setText(fireName);
+                                } else if (fieldName.includes('date')) {
+                                    field.setText(dateStr);
+                                } else if (fieldName.includes('crew number')) {
+                                    // Extract RO number from timesheet if available
+                                    const roNumber = timesheetData.rawData[59] && timesheetData.rawData[59][11] ? 
+                                        timesheetData.rawData[59][11] : 'RO_12345';
+                                    field.setText(roNumber);
+                                } else if (fieldName.includes('fire number')) {
+                                    // Extract incident number from timesheet if available
+                                    const incidentNumber = timesheetData.rawData[58] && timesheetData.rawData[58][11] ? 
+                                        timesheetData.rawData[58][11] : 'Incident_12345';
+                                    field.setText(incidentNumber);
+                                }
+                            } catch (e) {
+                                console.warn(`Could not fill field ${field.getName()}`);
+                            }
+                        });
+                        
+                        // Fill employee data - map to available fields
+                        dayEmployees.forEach((emp, index) => {
+                            // Convert classification to ACL title
+                            const aclClassification = classificationMap[emp.classification] || emp.classification;
+                            
+                            // Try to find fields for this employee
+                            let nameField = null;
+                            let classField = null;
+                            let dateField = null;
+                            
+                            fields.forEach(field => {
+                                const fieldName = field.getName().toLowerCase();
+                                
+                                // Look for field patterns like "text1", "text2", etc.
+                                if (fieldName.includes(`${index + 1}`) || fieldName.includes(`_${index + 1}`)) {
+                                    if (fieldName.includes('name') || (!fieldName.includes('class') && !fieldName.includes('date'))) {
+                                        nameField = field;
+                                    } else if (fieldName.includes('class')) {
+                                        classField = field;
+                                    } else if (fieldName.includes('date')) {
+                                        dateField = field;
+                                    }
+                                }
+                            });
+                            
+                            // Fill the fields if found
+                            if (nameField) {
+                                try {
+                                    nameField.setText(emp.name);
+                                } catch (e) {
+                                    console.warn(`Could not set name for ${emp.name}`);
+                                }
+                            }
+                            
+                            if (classField) {
+                                try {
+                                    classField.setText(aclClassification);
+                                } catch (e) {
+                                    console.warn(`Could not set class for ${emp.name}`);
+                                }
+                            }
+                            
+                            if (dateField) {
+                                try {
+                                    dateField.setText(dateStr);
+                                } catch (e) {
+                                    console.warn(`Could not set date for ${emp.name}`);
+                                }
+                            }
+                        });
+                        
+                        // Fill any remaining fields with placeholders
+                        for (let i = dayEmployees.length; i < 20; i++) {
+                            fields.forEach(field => {
+                                const fieldName = field.getName().toLowerCase();
+                                if (fieldName.includes(`${i + 1}`) || fieldName.includes(`_${i + 1}`)) {
+                                    try {
+                                        if (fieldName.includes('name') || (!fieldName.includes('class') && !fieldName.includes('date'))) {
+                                            field.setText(`Name${i+1}+`);
+                                        } else if (fieldName.includes('class')) {
+                                            field.setText(`Classification${i+1}+`);
+                                        }
+                                    } catch (e) {
+                                        // Ignore errors for placeholder fields
+                                    }
+                                }
+                            });
+                        }
+                        
+                        const pdfBytes = await pdfDoc.save();
+                        const filename = `${fireName}_${userName}_CTR_${dateStr.replace(/\//g, '-')}.pdf`;
+                        downloadPDF(pdfBytes, filename);
+                        resolve();
+                    } catch (error) {
+                        reject(error);
+                    }
+                };
+                reader.readAsArrayBuffer(ctrTemplate.file);
+            });
+        }
+        
+        function generateShiftTicketPDF(fireName, userName) {
+            return new Promise((resolve, reject) => {
+                const shiftTemplate = pdfTemplates.find(t => t.type === 'shift');
+                if (!shiftTemplate) {
+                    reject(new Error('Shift Ticket template not found'));
+                    return;
+                }
+                
+                const reader = new FileReader();
+                reader.onload = async function(e) {
+                    try {
+                        const pdfDoc = await PDFLib.PDFDocument.load(e.target.result);
+                        const form = pdfDoc.getForm();
+                        const fields = form.getFields();
+                        
+                        const dateStr = selectedDay.date instanceof Date ? 
+                            selectedDay.date.toLocaleDateString() : 
+                            new Date(selectedDay.date).toLocaleDateString();
+                        
+                        const dayEmployees = timesheetData.employees.filter(emp => {
+                            const worked = emp.rowData[selectedDay.workedCol];
+                            return worked >= 8 && worked <= 16;
+                        });
+                        
+                        // Count employees by classification
+                        const counts = { Guard: 0, Manager: 0, Supervisor: 0 };
+                        dayEmployees.forEach(emp => {
+                            counts[emp.classification]++;
+                        });
+                        
+                        const totalPeople = dayEmployees.length;
+                        const totalMiles = dayEmployees.reduce((sum, emp) => {
+                            return sum + (emp.rowData[selectedDay.milesCol] || 0);
+                        }, 0);
+                        
+                        // Fill fields based on field names and patterns
+                        fields.forEach(field => {
+                            const fieldName = field.getName().toLowerCase();
+                            
+                            try {
+                                if (fieldName.includes('contractor') || fieldName.includes('agency')) {
+                                    field.setText('Knight Division Tactical');
+                                } else if (fieldName.includes('incident') || fieldName.includes('fire')) {
+                                    field.setText(fireName);
+                                } else if (fieldName.includes('date')) {
+                                    field.setText(dateStr);
+                                } else if (fieldName.includes('resource order')) {
+                                    // Extract RO number from timesheet if available
+                                    const roNumber = timesheetData.rawData[59] && timesheetData.rawData[59][11] ? 
+                                        timesheetData.rawData[59][11] : 'RO_12345';
+                                    field.setText(roNumber);
+                                } else if (fieldName.includes('incident number')) {
+                                    // Extract incident number from timesheet if available
+                                    const incidentNumber = timesheetData.rawData[58] && timesheetData.rawData[58][11] ? 
+                                        timesheetData.rawData[58][11] : 'Incident_12345';
+                                    field.setText(incidentNumber);
+                                } else if (fieldName.includes('agreement number')) {
+                                    // Extract agreement number from timesheet if available
+                                    const agreementNumber = timesheetData.rawData[60] && timesheetData.rawData[60][11] ? 
+                                        timesheetData.rawData[60][11] : '140L372';
+                                    field.setText(agreementNumber);
+                                } else if (fieldName.includes('total') && fieldName.includes('hour')) {
+                                    field.setText(totalPeople.toString());
+                                } else if (fieldName.includes('miles') && fieldName.includes('quantity')) {
+                                    field.setText(totalMiles.toString());
+                                } else if (fieldName.includes('operator')) {
+                                    field.setText('KDT');
+                                } else if (fieldName.includes('total') && !fieldName.includes('hour')) {
+                                    field.setText(totalPeople.toString());
+                                }
+                                
+                                // Set hours to "12 Hours" for all employees
+                                if (fieldName.includes('hour') && field.constructor.name !== 'PDFCheckBox') {
+                                    field.setText('12 Hours');
+                                }
+                                
+                                // Check the miles checkbox
+                                if (fieldName.includes('miles') && field.constructor.name === 'PDFCheckBox') {
+                                    field.check();
+                                }
+                            } catch (e) {
+                                console.warn(`Could not fill field ${field.getName()}`);
+                            }
+                        });
+                        
+                        const pdfBytes = await pdfDoc.save();
+                        const filename = `${fireName}_${userName}_ShiftTicket_${dateStr.replace(/\//g, '-')}.pdf`;
+                        downloadPDF(pdfBytes, filename);
+                        resolve();
+                    } catch (error) {
+                        reject(error);
+                    }
+                };
+                reader.readAsArrayBuffer(shiftTemplate.file);
+            });
+        }
+        
+        function downloadPDF(pdfBytes, filename) {
+            const blob = new Blob([pdfBytes], { type: 'application/pdf' });
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = filename;
+            document.body.appendChild(a);
+            a.click();
+            document.body.removeChild(a);
+            URL.revokeObjectURL(url);
+        }
+    </script>
+</body>
+</html>
