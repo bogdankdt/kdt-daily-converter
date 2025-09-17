@@ -765,7 +765,7 @@
                 
                 const project = {
                     name: projectFolder.name,
-                    created: projectFolder.createdTime,
+                    created: projectFolder.createdTime || new Date().toISOString(),
                     driveFolderId: projectFolder.id,
                     driveStructure: {
                         projectFolder: projectFolder.id,
@@ -1125,11 +1125,6 @@
             try {
                 const projectFolders = await createActiveProjectFolders(projectName);
                 
-                // Copy timesheet from template if available
-                if (selectedTemplate.timesheetFile) {
-                    await copyTimesheetFromTemplate(selectedTemplate.timesheetFile.id, projectName, projectFolders.timesheetsFolder);
-                }
-                
                 const projectInstance = {
                     name: projectName,
                     templateId: selectedTemplate.name,
@@ -1137,8 +1132,22 @@
                     created: new Date().toISOString(),
                     driveStructure: projectFolders,
                     timesheetFiles: [],
+                    selectedTemplate: selectedTemplate, // Store template reference for PDF access
                     isActiveProject: true
                 };
+                
+                // Copy timesheet from template if available
+                let copiedTimesheet = null;
+                if (selectedTemplate.timesheetFile) {
+                    copiedTimesheet = await copyTimesheetFromTemplate(selectedTemplate.timesheetFile.id, projectName, projectFolders.timesheetsFolder);
+                    
+                    // Add the copied timesheet to the project's timesheetFiles array
+                    projectInstance.timesheetFiles = [{
+                        id: copiedTimesheet.id,
+                        name: copiedTimesheet.name,
+                        modifiedTime: copiedTimesheet.modifiedTime || new Date().toISOString()
+                    }];
+                }
                 
                 showStatus(`Project "${projectName}" created successfully! Folders created in Google Drive.`, 'success');
                 
@@ -1715,11 +1724,17 @@
         }
         
         function findPDFTemplate(type) {
-            if (!selectedTemplate || !selectedTemplate.pdfFiles) {
+            // First try to get template from current project (for active projects)
+            let templateToSearch = selectedTemplate;
+            if (currentProject && currentProject.selectedTemplate) {
+                templateToSearch = currentProject.selectedTemplate;
+            }
+            
+            if (!templateToSearch || !templateToSearch.pdfFiles) {
                 return null;
             }
             
-            return selectedTemplate.pdfFiles.find(file => {
+            return templateToSearch.pdfFiles.find(file => {
                 const fileName = file.name.toLowerCase();
                 if (type === 'ctr') {
                     return fileName.includes('ctr');
