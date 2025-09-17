@@ -325,7 +325,7 @@
     <div class="container">
         <div class="header">
             <div class="kdt-logo"></div>
-            <h1>KDT Daily CTR/Shift Ticket Auto-Generator v4.0</h1>
+            <h1>KDT Daily CTR/Shift Ticket Auto-Generator v4.1</h1>
             <p>Automated PDF generation with project management and team collaboration</p>
             
             <div class="mode-selector">
@@ -1088,12 +1088,20 @@
             
             // Find and restore the original template reference for PDF access
             if (currentProject.templateId) {
+                // Try to find template by stored ID
                 selectedTemplate = projects.find(t => t.name === currentProject.templateId);
-                if (selectedTemplate) {
-                    console.log(`Restored template reference for ${currentProject.templateId}, PDFs available:`, selectedTemplate.pdfFiles?.length || 0);
-                } else {
-                    console.warn(`Template ${currentProject.templateId} not found in projects array`);
-                }
+            } else {
+                // Fallback: if no templateId stored, use the first available template
+                // (This handles existing projects created before template ID storage was implemented)
+                selectedTemplate = projects.length > 0 ? projects[0] : null;
+                console.log('No templateId found, using fallback template:', selectedTemplate?.name);
+            }
+            
+            if (selectedTemplate) {
+                console.log(`Template available: ${selectedTemplate.name}, PDFs: ${selectedTemplate.pdfFiles?.length || 0}`);
+                selectedTemplate.pdfFiles?.forEach(file => console.log('PDF file:', file.name));
+            } else {
+                console.warn('No template found for PDF generation');
             }
             
             // Remove create project step if it exists
