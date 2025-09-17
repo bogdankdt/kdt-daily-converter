@@ -325,7 +325,7 @@
     <div class="container">
         <div class="header">
             <div class="kdt-logo"></div>
-            <h1>KDT Daily CTR/Shift Ticket Auto-Generator v4.1</h1>
+            <h1>KDT Daily CTR/Shift Ticket Auto-Generator v4.1.1</h1>
             <p>Automated PDF generation with project management and team collaboration</p>
             
             <div class="mode-selector">
@@ -1763,18 +1763,50 @@
         }
         
         async function downloadPDFTemplate(fileId) {
-            const response = await gapi.client.drive.files.get({
-                fileId: fileId,
-                alt: 'media'
-            });
-            
-            const base64Data = response.body;
-            const binaryString = atob(base64Data);
-            const bytes = new Uint8Array(binaryString.length);
-            for (let i = 0; i < binaryString.length; i++) {
-                bytes[i] = binaryString.charCodeAt(i);
+            try {
+                const response = await gapi.client.drive.files.get({
+                    fileId: fileId,
+                    alt: 'media'
+                });
+                
+                // Handle different response formats from Google Drive API
+                let arrayBuffer;
+                if (response.body) {
+                    // If response.body exists, it might be base64 encoded
+                    try {
+                        const binaryString = atob(response.body);
+                        const bytes = new Uint8Array(binaryString.length);
+                        for (let i = 0; i < binaryString.length; i++) {
+                            bytes[i] = binaryString.charCodeAt(i);
+                        }
+                        arrayBuffer = bytes.buffer;
+                    } catch (e) {
+                        console.warn('Base64 decode failed, trying direct conversion:', e);
+                        // If base64 decode fails, try treating as binary string
+                        const bytes = new Uint8Array(response.body.length);
+                        for (let i = 0; i < response.body.length; i++) {
+                            bytes[i] = response.body.charCodeAt(i);
+                        }
+                        arrayBuffer = bytes.buffer;
+                    }
+                } else if (response.result) {
+                    // Alternative response format
+                    const binaryString = atob(response.result);
+                    const bytes = new Uint8Array(binaryString.length);
+                    for (let i = 0; i < binaryString.length; i++) {
+                        bytes[i] = binaryString.charCodeAt(i);
+                    }
+                    arrayBuffer = bytes.buffer;
+                } else {
+                    throw new Error('No valid response data found');
+                }
+                
+                return arrayBuffer;
+                
+            } catch (error) {
+                console.error('Error downloading PDF template:', error);
+                throw new Error(`Failed to download PDF template: ${error.message}`);
             }
-            return bytes.buffer;
         }
         
         function downloadPDF(pdfBytes, filename) {
