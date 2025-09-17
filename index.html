@@ -1085,7 +1085,16 @@
             }
             
             currentProject = activeProjects[index];
-            selectedTemplate = projects.find(t => t.name === currentProject.templateId) || null;
+            
+            // Find and restore the original template reference for PDF access
+            if (currentProject.templateId) {
+                selectedTemplate = projects.find(t => t.name === currentProject.templateId);
+                if (selectedTemplate) {
+                    console.log(`Restored template reference for ${currentProject.templateId}, PDFs available:`, selectedTemplate.pdfFiles?.length || 0);
+                } else {
+                    console.warn(`Template ${currentProject.templateId} not found in projects array`);
+                }
+            }
             
             // Remove create project step if it exists
             const existingCreateStep = document.getElementById('createProjectStep');
