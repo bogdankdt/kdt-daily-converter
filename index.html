@@ -1114,6 +1114,9 @@
             document.getElementById('currentFireName').textContent = currentProject.name;
             document.getElementById('fireNameInput').value = currentProject.name;
             
+            // Add debug button for PDF field analysis
+            addDebugButton();
+            
             showStatus(`Selected active project: ${currentProject.name}`, 'success');
             document.getElementById('userWorkflow').scrollIntoView({ behavior: 'smooth' });
         }
@@ -1808,6 +1811,54 @@
                 throw new Error(`Failed to download PDF template: ${error.message}`);
             }
         }
+        
+        
+        // NEW: Debug function to discover PDF field names
+        async function debugPDFFields() {
+            if (!selectedTemplate || !selectedTemplate.pdfFiles) {
+                showStatus('No template selected for debugging.', 'error');
+                return;
+            }
+            
+            showStatus('Analyzing PDF field structures...', 'info');
+            
+            for (const pdfFile of selectedTemplate.pdfFiles) {
+                try {
+                    console.log(`\n=== ANALYZING ${pdfFile.name.toUpperCase()} ===`);
+                    
+                    const pdfData = await downloadPDFTemplate(pdfFile.id);
+                    const pdfDoc = await PDFLib.PDFDocument.load(pdfData);
+                    const form = pdfDoc.getForm();
+                    const fields = form.getFields();
+                    
+                    console.log(`Total fields found: ${fields.length}`);
+                    console.log(`\nField Details:`);
+                    
+                    fields.forEach((field, index) => {
+                        const fieldName = field.getName();
+                        const fieldType = field.constructor.name;
+                        console.log(`${index + 1}. "${fieldName}" (${fieldType})`);
+                    });
+                    
+                    // Look for potential employee fields
+                    const employeeFields = fields.filter(field => {
+                        const name = field.getName().toLowerCase();
+                        return name.includes('text') || name.includes('name') || name.includes('employee');
+                    });
+                    
+                    console.log(`\nPotential Employee Fields (${employeeFields.length}):`);
+                    employeeFields.forEach((field, index) => {
+                        console.log(`${index + 1}. "${field.getName()}"`);
+                    });
+                    
+                } catch (error) {
+                    console.error(`Error analyzing ${pdfFile.name}:`, error);
+                }
+            }
+            
+            showStatus('PDF field analysis complete! Check console for details.', 'success');
+        }
+        
         
         function downloadPDF(pdfBytes, filename) {
             const blob = new Blob([pdfBytes], { type: 'application/pdf' });
