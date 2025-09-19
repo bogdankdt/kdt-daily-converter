@@ -443,9 +443,12 @@
                         Generate PDFs: <span id="currentFireName">Fire Name</span>
                     </div>
                     
-                    <div style="margin-bottom: 20px;">
+                    <div style="display: grid; grid-template-columns: 1fr auto auto; gap: 15px; margin-bottom: 20px;">
                         <button onclick="refreshProjectData()" class="btn-info">
                             🔄 Refresh Data from Google Sheets
+                        </button>
+                        <button onclick="debugPDFFields()" class="btn-warning" style="width: auto; padding: 10px 20px;">
+                            🔍 Debug PDF Fields
                         </button>
                     </div>
                     
